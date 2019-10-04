@@ -1951,6 +1951,28 @@ func Run(t *testing.T, opt *Opt) {
 		// Purge the folder
 		err = operations.Purge(ctx, f, "")
 		if errors.Cause(err) != fs.ErrorDirNotFound {
+			// FIXME BEG
+			for try := 0; try < 5; try++ {
+				err = operations.Purge(ctx, remote, "")
+				if err == nil {
+					break
+				}
+				if errors.Cause(err) == fs.ErrorDirNotFound {
+					err = nil
+					break
+				}
+				errText := errors.Cause(err).Error()
+				if strings.Contains(errText, "no such file or directory") || strings.Contains(errText, "The system cannot find the file specified") {
+					err = nil
+					break
+				}
+				if strings.Contains(errText, "Access is denied") {
+					fs.Errorf(nil, "Someone holds a Windows file (known problem): %v", err)
+					err = nil
+				}
+				time.Sleep(time.Second)
+			}
+			// FIXME END
 			require.NoError(t, err)
 		}
 		purged = true

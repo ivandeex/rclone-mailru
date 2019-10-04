@@ -12,6 +12,7 @@ import (
 	gohash "hash"
 	"io"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"path"
 	"regexp"
@@ -298,7 +299,6 @@ func NewFs(ctx context.Context, name, rpath string, m configmap.Mapper) (fs.Fs, 
 		opt:  *opt,
 	}
 	cache.PinUntilFinalized(f.base, f)
-	f.dirSort = true // processEntries requires that meta Objects prerun data chunks atm.
 
 	if err := f.configure(opt.NameFormat, opt.MetaFormat, opt.HashType, opt.Transactions); err != nil {
 		return nil, err
@@ -366,7 +366,7 @@ type Fs struct {
 	xactIDMutex  sync.Mutex     // mutex for the source of randomness
 	opt          Options        // copy of Options
 	features     *fs.Features   // optional features
-	dirSort      bool           // reserved for future, ignored
+	dirSort      bool           // used by internal tests
 	useNoRename  bool           // can be set with the transactions option
 }
 
@@ -733,8 +733,15 @@ func (f *Fs) ListR(ctx context.Context, dir string, callback fs.ListRCallback) (
 	})
 }
 
+func fixme(text string, args ...interface{}) {
+	if false {
+		_ = log.Output(4, fmt.Sprintf("XXXX "+text, args...))
+	}
+}
+
 // processEntries assembles chunk entries into composite entries
 func (f *Fs) processEntries(ctx context.Context, origEntries fs.DirEntries, dirPath string) (newEntries fs.DirEntries, err error) {
+	fixme("---------- START %q ----------", dirPath) // path.Join(f.base.Root(), dirPath)
 	var sortedEntries fs.DirEntries
 	if f.dirSort {
 		// sort entries so that meta objects go before their chunks
@@ -750,9 +757,20 @@ func (f *Fs) processEntries(ctx context.Context, origEntries fs.DirEntries, dirP
 	isSubdir := make(map[string]bool)
 	txnByRemote := map[string]string{}
 
-	var tempEntries fs.DirEntries
-	for _, dirOrObject := range sortedEntries {
-		switch entry := dirOrObject.(type) {
+	isDir := make(map[string]bool)
+	isBad := make(map[string]bool)
+	isDummy := make(map[string]bool)
+	isChunk := make(map[string]bool)
+	hasHidden := make(map[string]bool)
+	composite := make(map[string]*Object)
+	var staged fs.DirEntries
+
+	// scan through directory and triage entries
+	for _, origEntry := range sortedEntries {
+		fixme("orig %q", origEntry)
+		var entry fs.Object
+
+		switch dirEntry := origEntry.(type) {
 		case fs.Object:
 			remote := entry.Remote()
 			mainRemote, chunkNo, ctrlType, xactID := f.parseChunkName(remote)
@@ -777,67 +795,146 @@ func (f *Fs) processEntries(ctx context.Context, origEntries fs.DirEntries, dirP
 				fs.Debugf(f, "skip orphan data chunk %q", remote)
 				break
 			}
-			if mainObject == nil && !f.useMeta {
-				// this is the "nometa" case
-				// create dummy chunked object without metadata
-				mainObject = f.newObject(mainRemote, nil, nil)
-				byRemote[mainRemote] = mainObject
-				if !badEntry[mainRemote] {
-					tempEntries = append(tempEntries, mainObject)
-				}
+			if composite[name] != nil {
+				// ...
 			}
-			if isSpecial {
-				if revealHidden {
-					fs.Infof(f, "ignore non-data chunk %q", remote)
-				}
-				// need to read metadata to ensure actual object type
-				// no need to read if metaobject is too big or absent,
-				// use the fact that before calling validate()
-				// the `size` field caches metaobject size, if any
-				if f.useMeta && mainObject != nil && mainObject.size <= maxMetadataSize {
-					mainObject.unsure = true
-				}
-				break
+			//name := dirEntry.Remote()
+			//wrapDir := fs.NewDirCopy(ctx, dirEntry)
+			//wrapDir.SetRemote(name)
+			//staged = append(staged, wrapDir)
+			//isDir[name] = true
+			if isChunk[name] {
+				// ...
 			}
-			if err := mainObject.addChunk(entry, chunkNo); err != nil {
-				if f.opt.FailHard {
-					return nil, err
-				}
-				badEntry[mainRemote] = true
+			if isDummy[name] {
+				// ...
 			}
-		case fs.Directory:
-			isSubdir[entry.Remote()] = true
-			wrapDir := fs.NewDirCopy(ctx, entry)
-			wrapDir.SetRemote(entry.Remote())
-			tempEntries = append(tempEntries, wrapDir)
+			continue
 		default:
 			if f.opt.FailHard {
-				return nil, fmt.Errorf("Unknown object type %T", entry)
+				return nil, fmt.Errorf("Unknown object type %T", dirEntry)
 			}
-			fs.Debugf(f, "unknown object type %T", entry)
+			fs.Debugf(f, "unknown object type %T in directory %q", dirEntry, dirPath)
+			continue
 		}
+
+		// analyze object name
+		filePath := entry.Remote()
+		mainPath, chunkNo, ctrlType, xactNo := f.parseChunkName(filePath)
+		//fixme("analyze %q -> %q %d", filePath, mainPath, chunkNo)
+
+		// handle meta objects and non-chunked files
+		if mainPath == "" {
+			if isDir[filePath] {
+				// TODO bail out
+			}
+			if isChunk[filePath] {
+				// TODO who wins?
+			}
+			if isDummy[filePath] {
+				composite[filePath].main = entry
+				isDummy[filePath] = false
+				fixme("dummy comes real %q", filePath)
+				// already staged
+				continue
+			}
+			if composite[filePath] != nil {
+				// impossible, bail out
+				fixme("IMPOSSIBLE DOUBLE COMPOSITE")
+				continue
+			}
+			object := f.newObject(filePath, entry, nil)
+			composite[filePath] = object
+			staged = append(staged, object)
+			fixme("stage real composite %q", filePath)
+			continue
+		}
+
+		// skip temporary and control chunks
+		if xactNo != "" || ctrlType != "" {
+			if !hasHidden[mainPath] {
+				hasHidden[mainPath] = true
+				if revealHidden {
+					// This stub message will be replaced when any control chunk
+					// type lands or chunker implements the `reveal hidden` flag.
+					fs.Infof(f, "%q has hidden chunks", mainPath)
+				}
+			}
+			continue
+		}
+		if chunkNo < 0 {
+			// impossible, bail out
+			fixme("IMPOSSIBLE NEGATIVE CHUNK")
+			continue
+		}
+
+		// handle data chunk
+		if isDir[filePath] {
+			// TODO bail out
+		}
+		if isDir[mainPath] {
+			// TODO bail out
+		}
+		if isChunk[mainPath] {
+			// TODO who wins?
+		}
+		main := composite[mainPath]
+		if main == nil {
+			// stage dummy composite object without metadata
+			main = f.newObject(mainPath, nil, nil)
+			composite[mainPath] = main
+			isDummy[mainPath] = true
+			staged = append(staged, main)
+			fixme("stage dummy composite %q", mainPath)
+		}
+		if err := main.addChunk(entry, chunkNo); err != nil {
+			if f.opt.FailHard {
+				return nil, err
+			}
+			isBad[mainPath] = true
+			isBad[filePath] = true
+		}
+		fixme("add chunk %q to composite %q", filePath, mainPath)
+		isChunk[filePath] = true
 	}
 
-	for _, entry := range tempEntries {
+	// process gathered entries
+	for _, entry := range staged {
 		if object, ok := entry.(*Object); ok {
-			remote := object.Remote()
-			if isSubdir[remote] {
+			filePath := object.Remote()
+			if isDir[filePath] {
 				if f.opt.FailHard {
-					return nil, fmt.Errorf("%q is both meta object and directory", remote)
+					return nil, fmt.Errorf("directory %q shadows object", filePath)
 				}
-				badEntry[remote] = true // fall thru
+				isBad[filePath] = true // fall thru
 			}
-			if badEntry[remote] {
-				fs.Debugf(f, "invalid directory entry %q", remote)
+			if isDummy[filePath] && !f.useMeta {
+				// implicit meta object when meta format is 'none'
+				isDummy[filePath] = false
+				fixme("good implicit composite %q", filePath)
+			}
+			if isDummy[filePath] {
+				// TODO missing meta object
+				for _, chunk := range composite[filePath].chunks {
+					fs.Debugf(f, "skip orphan chunk %q in directory %q", chunk.Remote(), dirPath)
+				}
+				isBad[filePath] = true
+				fixme("missing composite %q", filePath)
+				continue
+			}
+			if isBad[filePath] {
+				fs.Debugf(f, "invalid entry %q in directory %q", filePath, dirPath)
+				fixme("bad entry %q", filePath)
 				continue
 			}
 			if err := object.validate(); err != nil {
 				if f.opt.FailHard {
 					return nil, err
 				}
-				fs.Debugf(f, "invalid chunks in object %q", remote)
+				fs.Debugf(f, "invalid composite object %q in directory %q", filePath, dirPath)
 				continue
 			}
+			fixme("final good object %q size %d", filePath, object.Size())
 		}
 		newEntries = append(newEntries, entry)
 	}
@@ -845,6 +942,7 @@ func (f *Fs) processEntries(ctx context.Context, origEntries fs.DirEntries, dirP
 	if f.dirSort {
 		sort.Sort(newEntries)
 	}
+	fixme("---------- END ----------")
 	return newEntries, nil
 }
 

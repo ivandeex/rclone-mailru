@@ -8,8 +8,11 @@ import (
 	"io/ioutil"
 	"path"
 	"regexp"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/hash"
@@ -844,6 +847,226 @@ func testChunkerServerSideMove(t *testing.T, f *Fs) {
 	_ = operations.Purge(ctx, f.base, dir)
 }
 
+// helpers for naming test cases
+const namingTestSubdir = "uchunk"
+
+// namingTest encapsulates test helpers and allows to run
+// naming test cases over matrix of chunker parameters.
+type namingTest struct {
+	f        *Fs        // chunker
+	b        fs.Fs      // base remote wrapped by chunker
+	t        *testing.T // test interface
+	saveOpt  Options    // saved settings
+	saveSort bool
+	mu       *sync.Mutex     // chunker munge mutex
+	ctx      context.Context // context
+	dir      string          // test subdirectory on remote
+	testName string          // name of subtest group
+	testFunc func(*namingTest)
+	// helpers for test files
+	fileTime time.Time // typical time for test files
+	// chunker settings for current case
+	caseNo     int
+	nameFormat string
+	metaFormat string
+	hashType   string
+	failHard   bool
+	dirSort    bool
+}
+
+func (c *namingTest) toPath(name string) string {
+	return path.Join(c.dir, name)
+}
+
+func (c *namingTest) checkListing(items ...fstest.Item) {
+	fstest.CheckListingWithRoot(c.t, c.f, c.dir, items, nil, c.f.Precision())
+}
+
+func (c *namingTest) putBaseFile(name, contents string) {
+	file := &fstest.Item{
+		Path:    path.Join(c.dir, name),
+		ModTime: c.fileTime,
+	}
+	_, _ = fstests.PutTestContents(c.ctx, c.t, c.b, file, contents, true)
+	// fullPath = path.Join(c.b.Root(), file.Path))
+}
+
+func (c *namingTest) chunkName(name string, chunkNo int) string {
+	return c.f.makeChunkName(name, chunkNo, "", "")
+}
+
+func (c *namingTest) putComposite(name string) {
+	// manually simulate creation of composite file
+	if c.metaFormat != "none" {
+		metaData, err := marshalSimpleJSON(c.ctx, 3, 3, "", "")
+		require.NoError(c.t, err, "makeMeta")
+		c.putBaseFile(name, string(metaData))
+	}
+	c.putBaseFile(c.chunkName(name, 0), "a")
+	c.putBaseFile(c.chunkName(name, 1), "b")
+	c.putBaseFile(c.chunkName(name, 2), "c")
+}
+
+// wrapper that runs one step of matrix
+func (c *namingTest) runCase(t *testing.T, caseNo int, nameFormat, metaFormat string, failHard, dirSort bool) {
+	// lock mutex before munging chunker
+	c.mu.Lock()
+	c.t = t
+	f := c.f
+
+	// setup subtest parameters
+	c.caseNo = caseNo
+	c.nameFormat = nameFormat
+	c.metaFormat = metaFormat
+	c.failHard = failHard
+	c.dirSort = dirSort
+
+	defer func() {
+		// restore chunker settings
+		f.dirSort = c.saveSort
+		f.opt = c.saveOpt
+		_ = f.configure(f.opt.NameFormat, f.opt.MetaFormat, f.opt.HashType)
+		c.mu.Unlock()
+	}()
+
+	// create test directory directly on wrapped remote to prevent interference
+	c.dir = strings.ToLower(fmt.Sprintf("%s_%s_%d", namingTestSubdir, c.testName, c.caseNo))
+	//c.ctx = context.Background()
+	_ = c.b.Mkdir(c.ctx, c.dir)
+
+	// empty string triggers original setting
+	if c.nameFormat == "" {
+		c.nameFormat = c.saveOpt.NameFormat
+	}
+	if c.metaFormat == "" {
+		c.metaFormat = c.saveOpt.MetaFormat
+	}
+	// choose hash type compatible with meta format
+	c.hashType = c.saveOpt.HashType
+	if c.metaFormat == "none" {
+		c.hashType = "none"
+	}
+
+	// reconfigure chunker with step parameters
+	err := f.configure(c.nameFormat, c.metaFormat, c.hashType)
+	fs.Errorf("SUBTEST", "Pattern=%q Meta=%s Hash=%s Hard=%v Sort=%v", c.nameFormat, c.metaFormat, c.hashType, c.failHard, c.dirSort)
+	assert.NoError(c.t, err)
+	f.opt.NameFormat = c.nameFormat
+	f.opt.MetaFormat = c.metaFormat
+	f.opt.HashType = c.hashType
+	f.opt.StartFrom = 1 // constant for this test
+	f.opt.FailHard = c.failHard
+	f.dirSort = c.dirSort
+
+	c.testFunc(c)
+}
+
+func (c *namingTest) loopOverMatrix(t *testing.T) {
+	nameFormatCases := []string{
+		// 1st pattern traditionally starts with '*'
+		// meta objects of april and zoe run first followed by data chunks
+		"*.part.#",
+
+		// 2nd pattern is rather exotic and starts with 'p'
+		// april's chunks now prerun its meta object
+		// zoe's chunks still follow meta object
+		//"part.*.#",
+
+		//"", // also test with default name format
+	}
+	metaFormatCases := []string{
+		"simplejson",
+		//"none",
+		//"", // also test with default meta format
+	}
+	dirSortCases := []bool{
+		true,
+		//false,
+	}
+	failHardCases := []bool{
+		false,
+		//true,
+	}
+	caseNo := 0
+	for _, dirSort := range dirSortCases {
+		for _, failHard := range failHardCases {
+			for _, metaFormat := range metaFormatCases {
+				for _, nameFormat := range nameFormatCases {
+					subCase := new(namingTest)
+					*subCase = *c
+					caseNo++
+					subCase.runCase(t, caseNo, nameFormat, metaFormat, failHard, dirSort)
+				}
+			}
+		}
+	}
+}
+
+func runNamingTest(enable bool, testName string, t *testing.T, f *Fs, mu *sync.Mutex, testFunc func(*namingTest)) {
+	if !enable {
+		return
+	}
+	caseGroup := &namingTest{
+		ctx:      context.Background(),
+		t:        t,
+		f:        f,
+		b:        f.base,
+		mu:       mu,
+		testName: testName,
+		testFunc: testFunc,
+		saveOpt:  f.opt,
+		saveSort: f.dirSort,
+		fileTime: fstest.Time("2001-02-03T04:05:06.499999999Z"),
+	}
+	t.Run(testName, func(t *testing.T) {
+		caseGroup.loopOverMatrix(t)
+	})
+}
+
+// start of naming test cases
+//
+func testEarlyChunks(c *namingTest) {
+	// zoe's chunks follow its meta object in this test
+	c.putComposite("zoe")
+	// april's chunks can prerun its meta object depending on name format
+	c.putComposite("april")
+
+	c.checkListing(
+		fstest.Item{
+			ModTime: c.fileTime,
+			Path:    c.toPath("april"),
+			Size:    3,
+		},
+		fstest.Item{
+			ModTime: c.fileTime,
+			Path:    c.toPath("zoe"),
+			Size:    3,
+		},
+	)
+}
+
+func testBashMiddleChunk(c *namingTest) {
+	c.putComposite("april")
+	c.putComposite(c.chunkName("april", 1))
+	c.putComposite("zoe")
+	c.putComposite(c.chunkName("zoe", 1))
+
+	c.checkListing(
+		fstest.Item{
+			ModTime: c.fileTime,
+			Path:    c.toPath("april"),
+			Size:    3,
+		},
+		fstest.Item{
+			ModTime: c.fileTime,
+			Path:    c.toPath("zoe"),
+			Size:    3,
+		},
+	)
+}
+
+// end of naming test cases
+
 // InternalTest dispatches all internal tests
 func (f *Fs) InternalTest(t *testing.T) {
 	t.Run("PutLarge", func(t *testing.T) {
@@ -875,6 +1098,14 @@ func (f *Fs) InternalTest(t *testing.T) {
 	})
 	t.Run("ChunkerServerSideMove", func(t *testing.T) {
 		testChunkerServerSideMove(t, f)
+	t.Run("NamingTests", func(t *testing.T) {
+		//fs.Config.LogLevel = fs.LogLevelInfo //FIXME
+		if runtime.GOOS == "windows" {
+			t.Skip("naming tests cause unpurgeable file on appveyor")
+		}
+		mu := &sync.Mutex{} // chunker access mutex
+		runNamingTest(true, "EarlyChunks", t, f, mu, testEarlyChunks)
+		runNamingTest(false, "BashMiddleChunk", t, f, mu, testBashMiddleChunk)
 	})
 }
 
