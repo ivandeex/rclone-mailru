@@ -2,6 +2,7 @@
 package log
 
 import (
+	"bufio"
 	"io"
 	"log"
 	"os"
@@ -11,6 +12,9 @@ import (
 
 	"github.com/rclone/rclone/fs"
 	"github.com/sirupsen/logrus"
+
+	"github.com/rclone/rclone/lib/atexit"
+	"golang.org/x/net/http2"
 )
 
 // Options contains options for the remote control server
@@ -122,9 +126,18 @@ func InitLogging() {
 		if err != nil {
 			fs.Errorf(nil, "Failed to seek log file to end: %v", err)
 		}
-		log.SetOutput(f)
-		logrus.SetOutput(f)
+		var bw *bufio.Writer
+		bw = bufio.NewWriterSize(f, 32<<20) // 32M
 		redirectStderr(f)
+		log.SetOutput(bw)
+		log.SetPrefix("rclone: ")
+		log.SetFlags(log.Ltime | log.Lmicroseconds)
+		logrus.SetOutput(bw)
+		http2.VerboseLogs = true
+		atexit.Register(func() {
+			_ = bw.Flush()
+			_ = f.Close()
+		})
 	}
 
 	// Syslog output

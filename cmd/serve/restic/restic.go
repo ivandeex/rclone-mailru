@@ -24,12 +24,14 @@ import (
 	"github.com/rclone/rclone/lib/terminal"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 var (
 	stdio        bool
 	appendOnly   bool
 	privateRepos bool
+	serveHTTP2   bool
 )
 
 func init() {
@@ -38,6 +40,7 @@ func init() {
 	flags.BoolVarP(flagSet, &stdio, "stdio", "", false, "run an HTTP2 server on stdin/stdout")
 	flags.BoolVarP(flagSet, &appendOnly, "append-only", "", false, "disallow deletion of repository data")
 	flags.BoolVarP(flagSet, &privateRepos, "private-repos", "", false, "users can only access their private repo")
+	flags.BoolVarP(flagSet, &serveHTTP2, "http2", "", false, "run an HTTP2 server on network socket")
 }
 
 // Command definition for cobra
@@ -143,6 +146,18 @@ with a path of ` + "`/<username>/`" + `.
 				}
 				httpSrv.ServeConn(conn, opts)
 				return nil
+			}
+			if serveHTTP2 {
+				addr := s.Server.Opt.ListenAddr
+				if addr == "" {
+					addr = httplib.DefaultOpt.ListenAddr
+				}
+				h2s := &http2.Server{}
+				srv := &http.Server{
+					Addr:    addr,
+					Handler: h2c.NewHandler(s, h2s),
+				}
+				return srv.ListenAndServe()
 			}
 			err := s.Serve()
 			if err != nil {

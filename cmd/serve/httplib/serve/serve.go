@@ -43,6 +43,7 @@ func Object(w http.ResponseWriter, r *http.Request, o fs.Object) {
 	code := http.StatusOK
 	size := o.Size()
 	var options []fs.OpenOption
+	var logMsg string
 	if rangeRequest := r.Header.Get("Range"); rangeRequest != "" {
 		//fs.Debugf(nil, "Range: request %q", rangeRequest)
 		option, err := fs.ParseRangeOption(rangeRequest)
@@ -64,8 +65,10 @@ func Object(w http.ResponseWriter, r *http.Request, o fs.Object) {
 		// fs.Debugf(nil, "Range: offset=%d, limit=%d, end=%d, size=%d (object size %d)", offset, limit, end, size, o.Size())
 		// Content-Range: bytes 0-1023/146515
 		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", offset, end-1, o.Size()))
-		// fs.Debugf(nil, "Range: Content-Range: %q", w.Header().Get("Content-Range"))
+		logMsg = fmt.Sprintf("Content-Range: bytes %d-%d/%d, limit=%d, size=%d", offset, end-1, o.Size(), limit, size)
 		code = http.StatusPartialContent
+	} else {
+		logMsg = fmt.Sprintf("Content-Length: %d (object size %d)", size, o.Size())
 	}
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 
@@ -83,9 +86,39 @@ func Object(w http.ResponseWriter, r *http.Request, o fs.Object) {
 
 	w.WriteHeader(code)
 
-	n, err := io.Copy(w, in)
+	d := o.String()
+	if len(d) > 17 {
+		d = d[:17] + "."
+	}
+	fs.Infof(d, logMsg)
+	ww := &writeWrap{w: w, d: d}
+	_, err = io.Copy(ww, in)
+	n := ww.n
 	if err != nil {
 		fs.Errorf(o, "Didn't finish writing GET request (wrote %d/%d bytes): %v", n, size, err)
 		return
 	}
+	fs.Infof(o, "Done writing GET %d/%d bytes", n, size)
+}
+
+type writeWrap struct {
+	w io.Writer
+	d string
+	n int
+}
+
+func (ww *writeWrap) Write(p []byte) (n int, err error) {
+	n, err = ww.w.Write(p)
+	ww.n += n
+	d := ww.d
+	l := len(p)
+	switch {
+	case n == l && err == nil && l == 32768:
+		// fs.Infof(d, "Wrt 32k")
+	case n == l && err == nil:
+		fs.Infof(d, "Wrt %d", n)
+	default:
+		fs.Infof(d, "Wrt (%d = %d) %v", l, n, err)
+	}
+	return
 }

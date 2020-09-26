@@ -2,6 +2,9 @@ module github.com/rclone/rclone
 
 go 1.14
 
+// replace golang.org/x/net => ../src-net
+replace golang.org/x/net => github.com/ivandeex/golang-net v0.0.0-20201008153627-cb6a914710ba
+
 require (
 	bazil.org/fuse v0.0.0-20200407214033-5883e5a4b512
 	cloud.google.com/go v0.59.0 // indirect
