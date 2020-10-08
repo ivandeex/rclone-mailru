@@ -1,0 +1,212 @@
+<<<<<<<<<<<<<<<<<<<<<<< restic prepares to request object from rclone
+restic: 04:30:14.105991 [58] header length: 5101
+restic: 04:30:14.106011 [58] ReadAt(<data/72058d60b6>) at 4431057, len 5105
+restic: 04:30:14.106041 [58] no readahead for <data/72058d60b6>, not tree file
+restic: 04:30:14.106062 [58] Load(<data/72058d60b6>, 5105, 4431057): partial file requested, delegating to backend
+restic: 04:30:14.106093 [58] Load <data/72058d60b6>, length 5105, offset 4431057
+restic: 04:30:14.106131 [58] Load(<data/72058d60b6>) send range bytes=4431057-4436161
+>>>>>>>>>>>>>>>>>>>>>>>
+
+restic: 04:30:14.106139 http2: Transport encoding header ":authority" = "localhost"
+restic: 04:30:14.106141 http2: Transport encoding header ":method" = "GET"
+restic: 04:30:14.106143 http2: Transport encoding header ":path" = "/data/72450945296962ff2d9bae97feb572568e234e2a02200f3add17bfdbb5bedbcd"
+restic: 04:30:14.106148 http2: Transport encoding header ":scheme" = "http"
+restic: 04:30:14.106150 http2: Transport encoding header "range" = "bytes=4212594-4213184"
+restic: 04:30:14.106153 http2: Transport encoding header "accept" = "application/vnd.x.restic.rest.v2"
+restic: 04:30:14.106155 http2: Transport encoding header "user-agent" = "Go-http-client/2.0"
+restic: 04:30:14.106157 client writing headers on sid 6507
+restic: 04:30:14.106173 http2: Transport encoding header ":authority" = "localhost"
+restic: 04:30:14.106175 http2: Transport encoding header ":method" = "GET"
+restic: 04:30:14.106177 http2: Transport encoding header ":path" = "/data/72403458eda0c8948098ef5d7156dd711f4a90d8ab5d0c050e9c017cd5bea5ac"
+restic: 04:30:14.106181 http2: Transport encoding header ":scheme" = "http"
+restic: 04:30:14.106183 http2: Transport encoding header "range" = "bytes=5982451-5983041"
+restic: 04:30:14.106186 http2: Transport encoding header "accept" = "application/vnd.x.restic.rest.v2"
+restic: 04:30:14.106188 http2: Transport encoding header "user-agent" = "Go-http-client/2.0"
+restic: 04:30:14.106189 client writing headers on sid 6509
+restic: 04:30:14.106214 [1] pack 73c8c9aaa8473b48cac7556dda79ceb5ccbbf08b767550c019c39fb5bb2c1d19 contains 51 blobs
+restic: 04:30:14.106225 http2: Transport received HEADERS flags=END_HEADERS stream=6505 len=29
+restic: 04:30:14.106232 http2: Transport received DATA flags=END_STREAM stream=6505 len=591
+restic: 04:30:14.106234 in-data +end sid 6505 len 591 pipe err <nil>
+restic: 04:30:14.106240 http2: Transport received HEADERS flags=END_HEADERS stream=6493 len=29
+restic: 04:30:14.106244 http2: Transport received DATA flags=END_STREAM stream=6493 len=591
+restic: 04:30:14.106247 in-data +end sid 6493 len 591 pipe err <nil>
+restic: 04:30:14.106301 [59] rrb load: close for <data/720a329859> read 591 of 591 fn "restic.ReadAt.func1" @ "readerat.go" err <nil>
+restic: 04:30:14.106332 [59] ReadAt(<data/720a329859>) ReadFull returned 591 bytes
+restic: 04:30:14.106348 [59] header length: 994
+restic: 04:30:14.106368 [59] ReadAt(<data/720a329859>) at 4517352, len 998
+restic: 04:30:14.106398 [59] no readahead for <data/720a329859>, not tree file
+restic: 04:30:14.106418 [59] Load(<data/720a329859>, 998, 4517352): partial file requested, delegating to backend
+restic: 04:30:14.106450 [59] Load <data/720a329859>, length 998, offset 4517352
+restic: 04:30:14.106488 [59] Load(<data/720a329859>) send range bytes=4517352-4518349
+restic: 04:30:14.106500 http2: Transport encoding header ":authority" = "localhost"
+restic: 04:30:14.106502 http2: Transport encoding header ":method" = "GET"
+restic: 04:30:14.106505 http2: Transport encoding header ":path" = "/data/7220814ae0161c265c733b4df3559f4c8d69f9cd8c83f1c4d50f3dd15b74732c"
+restic: 04:30:14.106506 http2: Transport encoding header ":scheme" = "http"
+restic: 04:30:14.106508 http2: Transport encoding header "accept" = "application/vnd.x.restic.rest.v2"
+restic: 04:30:14.106510 http2: Transport encoding header "range" = "bytes=8864691-8865503"
+restic: 04:30:14.106514 http2: Transport encoding header "user-agent" = "Go-http-client/2.0"
+restic: 04:30:14.106517 client writing headers on sid 6511
+restic: 04:30:14.106562 [60] rrb load: close for <data/723b402922> read 591 of 591 fn "restic.ReadAt.func1" @ "readerat.go" err <nil>
+restic: 04:30:14.106579 [60] ReadAt(<data/723b402922>) ReadFull returned 591 bytes
+restic: 04:30:14.106594 [60] header length: 106
+restic: 04:30:14.106618 [60] size: 5245174
+restic: 04:30:14.106636 [60] ReadAt(<data/7263ac3300>) at 5244583, len 591
+restic: 04:30:14.106663 [60] no readahead for <data/7263ac3300>, not tree file
+restic: 04:30:14.106683 [60] Load(<data/7263ac3300>, 591, 5244583): partial file requested, delegating to backend
+restic: 04:30:14.106715 [60] Load <data/7263ac3300>, length 591, offset 5244583
+restic: 04:30:14.106751 [60] Load(<data/7263ac3300>) send range bytes=5244583-5245173
+restic: 04:30:14.106761 http2: Transport encoding header ":authority" = "localhost"
+restic: 04:30:14.106763 http2: Transport encoding header ":method" = "GET"
+restic: 04:30:14.106765 http2: Transport encoding header ":path" = "/data/7255219019b5a302b1872dbeb52ddfc3b8d0e41fc1090a62b94c3ac596e03c3b"
+restic: 04:30:14.106769 http2: Transport encoding header ":scheme" = "http"
+restic: 04:30:14.106771 http2: Transport encoding header "range" = "bytes=4459379-4459969"
+restic: 04:30:14.106777 http2: Transport encoding header "accept" = "application/vnd.x.restic.rest.v2"
+restic: 04:30:14.106779 http2: Transport encoding header "user-agent" = "Go-http-client/2.0"
+restic: 04:30:14.106781 client writing headers on sid 6513
+restic: 04:30:14.106810 [1] pack 723b402922777b0f6163d76a27918de9bb9f371cfebff170b96a590ea77eeaa3 contains 2 blobs
+restic: 04:30:14.106827 http2: Transport received HEADERS flags=END_HEADERS stream=6507 len=29
+restic: 04:30:14.106833 http2: Transport received DATA flags=END_STREAM stream=6507 len=591
+restic: 04:30:14.106836 in-data +end sid 6507 len 591 pipe err <nil>
+restic: 04:30:14.106844 http2: Transport received HEADERS flags=END_HEADERS stream=6509 len=29
+restic: 04:30:14.106849 http2: Transport received DATA flags=END_STREAM stream=6509 len=591
+restic: 04:30:14.106851 in-data +end sid 6509 len 591 pipe err <nil>
+restic: 04:30:14.106888 [56] rrb load: close for <data/72403458ed> read 591 of 591 fn "restic.ReadAt.func1" @ "readerat.go" err <nil>
+restic: 04:30:14.106906 [56] ReadAt(<data/72403458ed>) ReadFull returned 591 bytes
+restic: 04:30:14.106920 [56] header length: 1956
+restic: 04:30:14.106938 [56] ReadAt(<data/72403458ed>) at 5981082, len 1960
+restic: 04:30:14.106965 [56] no readahead for <data/72403458ed>, not tree file
+restic: 04:30:14.106985 [56] Load(<data/72403458ed>, 1960, 5981082): partial file requested, delegating to backend
+restic: 04:30:14.107017 [56] Load <data/72403458ed>, length 1960, offset 5981082
+restic: 04:30:14.107053 [56] Load(<data/72403458ed>) send range bytes=5981082-5983041
+restic: 04:30:14.107061 http2: Transport encoding header ":authority" = "localhost"
+restic: 04:30:14.107063 http2: Transport encoding header ":method" = "GET"
+restic: 04:30:14.107065 http2: Transport encoding header ":path" = "/data/72602da38e8c845a165ed038a03e2fb867e19fdc93c6e0c922b0a94c1fd3e35e"
+restic: 04:30:14.107069 http2: Transport encoding header ":scheme" = "http"
+restic: 04:30:14.107071 http2: Transport encoding header "range" = "bytes=5966803-5967393"
+restic: 04:30:14.107075 http2: Transport encoding header "accept" = "application/vnd.x.restic.rest.v2"
+restic: 04:30:14.107076 http2: Transport encoding header "user-agent" = "Go-http-client/2.0"
+restic: 04:30:14.107078 client writing headers on sid 6515
+restic: 04:30:14.107118 [54] rrb load: close for <data/7245094529> read 591 of 591 fn "restic.ReadAt.func1" @ "readerat.go" err <nil>
+restic: 04:30:14.107136 [54] ReadAt(<data/7245094529>) ReadFull returned 591 bytes
+restic: 04:30:14.107152 [54] header length: 291
+restic: 04:30:14.107181 [54] size: 4213157
+restic: 04:30:14.107201 [54] ReadAt(<data/72647b075c>) at 4212566, len 591
+restic: 04:30:14.107231 [54] no readahead for <data/72647b075c>, not tree file
+restic: 04:30:14.107251 [54] Load(<data/72647b075c>, 591, 4212566): partial file requested, delegating to backend
+restic: 04:30:14.107283 [54] Load <data/72647b075c>, length 591, offset 4212566
+restic: 04:30:14.107318 [54] Load(<data/72647b075c>) send range bytes=4212566-4213156
+restic: 04:30:14.107329 http2: Transport encoding header ":authority" = "localhost"
+
+<<<<<<<<<<<<<<<<<<<<<<< restic sends request headers to rclone
+restic: 04:30:14.107331 http2: Transport encoding header ":method" = "GET"
+restic: 04:30:14.107333 http2: Transport encoding header ":path" = "/data/72058d60b6f7ae76e9d83811dc5c89b3b519c66de7441c723730936487090a75"
+restic: 04:30:14.107335 http2: Transport encoding header ":scheme" = "http"
+restic: 04:30:14.107337 http2: Transport encoding header "range" = "bytes=4431057-4436161"
+restic: 04:30:14.107340 http2: Transport encoding header "accept" = "application/vnd.x.restic.rest.v2"
+restic: 04:30:14.107342 http2: Transport encoding header "user-agent" = "Go-http-client/2.0"
+restic: 04:30:14.107346 client writing headers on sid 6517
+>>>>>>>>>>>>>>>>>>>>>>>
+
+restic: 04:30:14.107373 [1] pack 72450945296962ff2d9bae97feb572568e234e2a02200f3add17bfdbb5bedbcd contains 7 blobs
+restic: 04:30:14.107385 http2: Transport received HEADERS flags=END_HEADERS stream=6511 len=34
+restic: 04:30:14.107391 http2: Transport received DATA flags=END_STREAM stream=6511 len=813
+restic: 04:30:14.107393 in-data +end sid 6511 len 813 pipe err <nil>
+restic: 04:30:14.107401 http2: Transport received HEADERS flags=END_HEADERS stream=6513 len=30
+restic: 04:30:14.107405 http2: Transport received DATA flags=END_STREAM stream=6513 len=591
+restic: 04:30:14.107407 in-data +end sid 6513 len 591 pipe err <nil>
+restic: 04:30:14.107443 [53] rrb load: close for <data/7255219019> read 591 of 591 fn "restic.ReadAt.func1" @ "readerat.go" err <nil>
+restic: 04:30:14.107463 [53] ReadAt(<data/7255219019>) ReadFull returned 591 bytes
+restic: 04:30:14.107478 [53] header length: 106
+restic: 04:30:14.107498 [53] size: 4684541
+restic: 04:30:14.107516 [53] ReadAt(<data/726538348b>) at 4683950, len 591
+restic: 04:30:14.107543 [53] no readahead for <data/726538348b>, not tree file
+restic: 04:30:14.107563 [53] Load(<data/726538348b>, 591, 4683950): partial file requested, delegating to backend
+restic: 04:30:14.107595 [53] Load <data/726538348b>, length 591, offset 4683950
+restic: 04:30:14.107631 [53] Load(<data/726538348b>) send range bytes=4683950-4684540
+restic: 04:30:14.107666 [55] rrb load: close for <data/7220814ae0> read 813 of 813 fn "restic.ReadAt.func1" @ "readerat.go" err <nil>
+restic: 04:30:14.107684 [55] ReadAt(<data/7220814ae0>) ReadFull returned 813 bytes
+restic: 04:30:14.107699 [55] header length: 809
+restic: 04:30:14.107733 http2: Transport encoding header ":authority" = "localhost"
+restic: 04:30:14.107734 http2: Transport encoding header ":method" = "GET"
+restic: 04:30:14.107737 http2: Transport encoding header ":path" = "/data/7263ac330039e7f0ce7511d9b5153fbaaed39b9766d13e07733def6b8466b411"
+restic: 04:30:14.107741 http2: Transport encoding header ":scheme" = "http"
+restic: 04:30:14.107743 http2: Transport encoding header "range" = "bytes=5244583-5245173"
+restic: 04:30:14.107746 http2: Transport encoding header "accept" = "application/vnd.x.restic.rest.v2"
+restic: 04:30:14.107748 http2: Transport encoding header "user-agent" = "Go-http-client/2.0"
+restic: 04:30:14.107752 client writing headers on sid 6519
+restic: 04:30:14.107764 http2: Transport encoding header ":authority" = "localhost"
+restic: 04:30:14.107766 http2: Transport encoding header ":method" = "GET"
+restic: 04:30:14.107768 http2: Transport encoding header ":path" = "/data/720a329859b439f28b635caf28e17a31e4ae28d0f240781af0b2664b8283a264"
+restic: 04:30:14.107769 http2: Transport encoding header ":scheme" = "http"
+restic: 04:30:14.107772 http2: Transport encoding header "accept" = "application/vnd.x.restic.rest.v2"
+restic: 04:30:14.107773 http2: Transport encoding header "range" = "bytes=4517352-4518349"
+restic: 04:30:14.107776 http2: Transport encoding header "user-agent" = "Go-http-client/2.0"
+restic: 04:30:14.107778 client writing headers on sid 6521
+restic: 04:30:14.107801 [1] pack 7255219019b5a302b1872dbeb52ddfc3b8d0e41fc1090a62b94c3ac596e03c3b contains 2 blobs
+restic: 04:30:14.107821 [1] pack 7220814ae0161c265c733b4df3559f4c8d69f9cd8c83f1c4d50f3dd15b74732c contains 21 blobs
+restic: 04:30:14.107835 [55] size: 5967323
+restic: 04:30:14.107875 [55] ReadAt(<data/726cbf45e8>) at 5966732, len 591
+restic: 04:30:14.107912 [55] no readahead for <data/726cbf45e8>, not tree file
+restic: 04:30:14.107932 [55] Load(<data/726cbf45e8>, 591, 5966732): partial file requested, delegating to backend
+restic: 04:30:14.107965 [55] Load <data/726cbf45e8>, length 591, offset 5966732
+restic: 04:30:14.108001 [55] Load(<data/726cbf45e8>) send range bytes=5966732-5967322
+restic: 04:30:14.108021 http2: Transport received HEADERS flags=END_HEADERS stream=6515 len=30
+restic: 04:30:14.108027 http2: Transport received DATA flags=END_STREAM stream=6515 len=591
+restic: 04:30:14.108030 in-data +end sid 6515 len 591 pipe err <nil>
+restic: 04:30:14.108038 http2: Transport received HEADERS flags=END_HEADERS stream=6519 len=29
+restic: 04:30:14.108044 http2: Transport received DATA flags=END_STREAM stream=6519 len=591
+restic: 04:30:14.108046 in-data +end sid 6519 len 591 pipe err <nil>
+restic: 04:30:14.108082 [60] rrb load: close for <data/7263ac3300> read 591 of 591 fn "restic.ReadAt.func1" @ "readerat.go" err <nil>
+restic: 04:30:14.108100 [60] ReadAt(<data/7263ac3300>) ReadFull returned 591 bytes
+restic: 04:30:14.108115 [60] header length: 254
+restic: 04:30:14.108142 [60] size: 4559252
+restic: 04:30:14.108160 [60] ReadAt(<data/7274d5c2b8>) at 4558661, len 591
+restic: 04:30:14.108188 [60] no readahead for <data/7274d5c2b8>, not tree file
+restic: 04:30:14.108208 [60] Load(<data/7274d5c2b8>, 591, 4558661): partial file requested, delegating to backend
+restic: 04:30:14.108240 [60] Load <data/7274d5c2b8>, length 591, offset 4558661
+restic: 04:30:14.108276 [60] Load(<data/7274d5c2b8>) send range bytes=4558661-4559251
+restic: 04:30:14.108312 [61] rrb load: close for <data/72602da38e> read 591 of 591 fn "restic.ReadAt.func1" @ "readerat.go" err <nil>
+restic: 04:30:14.108329 [61] ReadAt(<data/72602da38e>) ReadFull returned 591 bytes
+restic: 04:30:14.108344 [61] header length: 254
+restic: 04:30:14.108364 http2: Transport encoding header ":authority" = "localhost"
+restic: 04:30:14.108366 http2: Transport encoding header ":method" = "GET"
+restic: 04:30:14.108369 http2: Transport encoding header ":path" = "/data/72647b075c8b3c4c5e71eddd0bc21e5ee8ffcae218b86473e81c012c77484625"
+restic: 04:30:14.108373 http2: Transport encoding header ":scheme" = "http"
+restic: 04:30:14.108375 http2: Transport encoding header "accept" = "application/vnd.x.restic.rest.v2"
+restic: 04:30:14.108377 http2: Transport encoding header "range" = "bytes=4212566-4213156"
+restic: 04:30:14.108388 http2: Transport encoding header "user-agent" = "Go-http-client/2.0"
+restic: 04:30:14.108390 client writing headers on sid 6523
+restic: 04:30:14.108403 http2: Transport encoding header ":authority" = "localhost"
+restic: 04:30:14.108405 http2: Transport encoding header ":method" = "GET"
+restic: 04:30:14.108407 http2: Transport encoding header ":path" = "/data/72403458eda0c8948098ef5d7156dd711f4a90d8ab5d0c050e9c017cd5bea5ac"
+restic: 04:30:14.108408 http2: Transport encoding header ":scheme" = "http"
+restic: 04:30:14.108410 http2: Transport encoding header "range" = "bytes=5981082-5983041"
+restic: 04:30:14.108414 http2: Transport encoding header "accept" = "application/vnd.x.restic.rest.v2"
+restic: 04:30:14.108416 http2: Transport encoding header "user-agent" = "Go-http-client/2.0"
+restic: 04:30:14.108418 client writing headers on sid 6525
+restic: 04:30:14.108442 [1] pack 7263ac330039e7f0ce7511d9b5153fbaaed39b9766d13e07733def6b8466b411 contains 6 blobs
+restic: 04:30:14.108462 [1] pack 72602da38e8c845a165ed038a03e2fb867e19fdc93c6e0c922b0a94c1fd3e35e contains 6 blobs
+restic: 04:30:14.108476 [61] size: 7074637
+restic: 04:30:14.108494 [61] ReadAt(<data/72794ee157>) at 7074046, len 591
+restic: 04:30:14.108521 [61] no readahead for <data/72794ee157>, not tree file
+restic: 04:30:14.108541 [61] Load(<data/72794ee157>, 591, 7074046): partial file requested, delegating to backend
+restic: 04:30:14.108573 [61] Load <data/72794ee157>, length 591, offset 7074046
+restic: 04:30:14.108609 [61] Load(<data/72794ee157>) send range bytes=7074046-7074636
+
+<<<<<<<<<<<<<<<<<<<<<<< rclone sends object headers and data
+restic: 04:30:14.108625 http2: Transport received HEADERS flags=END_HEADERS stream=6517 len=33
+restic: 04:30:14.108637 http2: Transport received DATA stream=6517 len=5105
+restic: 04:30:14.108639 in-data !end sid 6517 len 5105 pipe err <nil>
+>>>>>>>>>>>>>>>>>>>>>>>
+
+<<<<<<<<<<<<<<<<<<<<<<< restic closes object stream without waiting for EOF from rclone
+restic: 04:30:14.108653 unexpected reset on sid 6517 unread 0 pipe err <nil>
+restic: 04:30:14.108686 [58] rrb load: close for <data/72058d60b6> read 5105 of 5105 fn "restic.ReadAt.func1" @ "readerat.go" err <nil>
+restic: 04:30:14.108704 [58] ReadAt(<data/72058d60b6>) ReadFull returned 5105 bytes
+>>>>>>>>>>>>>>>>>>>>>>>
+
+<<<<<<<<<<<<<<<<<<<<<<< rclone prints error, restic is not aware, restic proceeds to next operation
+restic: 04:30:14.108719 [58] header length: 5101
+restic: 04:30:14.108887 [58] size: 4777029
+restic: 04:30:14.108905 [58] ReadAt(<data/72a66a2ab0>) at 4776438, len 591
+>>>>>>>>>>>>>>>>>>>>>>>

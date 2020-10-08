@@ -13,6 +13,8 @@ on:
       - '!upstream'
     tags:
       - '*'
+    paths-ignore:
+      - 'stream-reset/**'
   pull_request:
 
 jobs:

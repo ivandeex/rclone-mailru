@@ -1,0 +1,73 @@
+<<<<<<<<<<<<<<<<<<<<<<< rclone receives request headers from restic
+rclone: 04:30:14.107393 http2: server read frame HEADERS flags=END_STREAM|END_HEADERS stream=6517 len=23
+rclone: 04:30:14.107400 headers serve run handler for path /data/72058d60b6f7ae76e9d83811dc5c89b3b519c66de7441c723730936487090a75
+>>>>>>>>>>>>>>>>>>>>>>>
+
+rclone: 04:30:14.107425 http2: server encoding header ":status" = "206"
+rclone: 04:30:14.107427 http2: server encoding header "accept-ranges" = "bytes"
+rclone: 04:30:14.107429 http2: server encoding header "content-range" = "bytes 5966803-5967393/5967394"
+rclone: 04:30:14.107433 http2: server encoding header "content-length" = "591"
+rclone: 04:30:14.107442 send data start sid 6515 len 591 end true
+rclone: 04:30:14.107456 writeData.writeFrame on sid 6515 len 591 end true
+rclone: 04:30:14.107457 wroteData frame on sid 6515 len 591 end true
+rclone: 04:30:14.107462 send data done sid 6515 len 591 end true
+
+<<<<<<<<<<<<<<<<<<<<<<< rclone sends response headers to restic
+rclone: 04:30:14.107505 INFO  : data/72/72058d60b.: Content-Range: bytes 4431057-4436161/4436162, limit=5105, size=5105
+>>>>>>>>>>>>>>>>>>>>>>>
+
+rclone: 04:30:14.107778 http2: server read frame HEADERS flags=END_STREAM|END_HEADERS stream=6519 len=75
+rclone: 04:30:14.107785 headers serve run handler for path /data/7263ac330039e7f0ce7511d9b5153fbaaed39b9766d13e07733def6b8466b411
+rclone: 04:30:14.107794 http2: server read frame HEADERS flags=END_STREAM|END_HEADERS stream=6521 len=24
+rclone: 04:30:14.107799 headers serve run handler for path /data/720a329859b439f28b635caf28e17a31e4ae28d0f240781af0b2664b8283a264
+rclone: 04:30:14.107936 INFO  : data/72/7263ac330.: Content-Range: bytes 5244583-5245173/5245174, limit=591, size=591
+rclone: 04:30:14.107951 INFO  : data/72/7263ac330.: Wrt 591
+rclone: 04:30:14.107955 INFO  : data/72/7263ac330039e7f0ce7511d9b5153fbaaed39b9766d13e07733def6b8466b411: Done writing GET 591/591 bytes
+rclone: 04:30:14.107994 http2: server encoding header ":status" = "206"
+rclone: 04:30:14.107997 http2: server encoding header "accept-ranges" = "bytes"
+rclone: 04:30:14.107999 http2: server encoding header "content-range" = "bytes 5244583-5245173/5245174"
+rclone: 04:30:14.108004 http2: server encoding header "content-length" = "591"
+rclone: 04:30:14.108020 send data start sid 6519 len 591 end true
+rclone: 04:30:14.108028 writeData.writeFrame on sid 6519 len 591 end true
+rclone: 04:30:14.108029 wroteData frame on sid 6519 len 591 end true
+rclone: 04:30:14.108037 send data done sid 6519 len 591 end true
+rclone: 04:30:14.108111 INFO  : data/72/720a32985.: Content-Range: bytes 4517352-4518349/4518350, limit=998, size=998
+rclone: 04:30:14.108347 http2: server encoding header ":status" = "206"
+rclone: 04:30:14.108353 http2: server encoding header "accept-ranges" = "bytes"
+rclone: 04:30:14.108357 http2: server encoding header "content-range" = "bytes 4431057-4436161/4436162"
+rclone: 04:30:14.108364 http2: server encoding header "content-length" = "5105"
+
+<<<<<<<<<<<<<<<<<<<<<<< rclone sends object data to restic
+rclone: 04:30:14.108379 send data start sid 6517 len 5105 end false
+>>>>>>>>>>>>>>>>>>>>>>>
+
+rclone: 04:30:14.108421 http2: server read frame HEADERS flags=END_STREAM|END_HEADERS stream=6523 len=73
+rclone: 04:30:14.108446 headers serve run handler for path /data/72647b075c8b3c4c5e71eddd0bc21e5ee8ffcae218b86473e81c012c77484625
+
+<<<<<<<<<<<<<<<<<<<<<<< object data runs through http2 queues
+rclone: 04:30:14.108455 writeData.writeFrame on sid 6517 len 5105 end false
+>>>>>>>>>>>>>>>>>>>>>>>
+
+rclone: 04:30:14.108568 INFO  : data/72/72647b075.: Content-Range: bytes 4212566-4213156/4213157, limit=591, size=591
+rclone: 04:30:14.108584 INFO  : data/72/72647b075.: Wrt 591
+rclone: 04:30:14.108590 INFO  : data/72/72647b075c8b3c4c5e71eddd0bc21e5ee8ffcae218b86473e81c012c77484625: Done writing GET 591/591 bytes
+rclone: 04:30:14.108648 http2: server read frame HEADERS flags=END_STREAM|END_HEADERS stream=6525 len=23
+rclone: 04:30:14.108659 headers serve run handler for path /data/72403458eda0c8948098ef5d7156dd711f4a90d8ab5d0c050e9c017cd5bea5ac
+
+<<<<<<<<<<<<<<<<<<<<<<< restic receives all data, updates rclone quota and closes stream without waiting for EOF
+rclone: 04:30:14.108669 http2: server read frame WINDOW_UPDATE stream=6517 len=4 incr=5105
+rclone: 04:30:14.108681 http2: server read frame RST_STREAM stream=6517 len=4 ErrCode=CANCEL
+>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<< stream reset from http2 input goroutine reaches sender before the queued success signal from the wroteData channel
+rclone: 04:30:14.108684 stream reset on sid 6517
+>>>>>>>>>>>>>>>>>>>>>>>
+
+rclone: 04:30:14.108854 INFO  : data/72/72403458e.: Content-Range: bytes 5981082-5983041/5983042, limit=1960, size=1960
+rclone: 04:30:14.108871 INFO  : data/72/72403458e.: Wrt 1960
+rclone: 04:30:14.108876 INFO  : data/72/72403458eda0c8948098ef5d7156dd711f4a90d8ab5d0c050e9c017cd5bea5ac: Done writing GET 1960/1960 bytes
+
+<<<<<<<<<<<<<<<<<<<<<<< rclone being inside "io.Copy" receives stream reset from restic and prints error
+rclone: 04:30:14.108917 send data cancel on sid 6517 len 5105 end false
+rclone: 04:30:14.108921 INFO  : data/72/72058d60b.: Wrt (5105 = 0) http2: stream closed while sending data
+rclone: 04:30:14.108929 ERROR : data/72/72058d60b6f7ae76e9d83811dc5c89b3b519c66de7441c723730936487090a75: Didn't finish writing GET request (wrote 0/5105 bytes): http2: stream closed while sending data
+>>>>>>>>>>>>>>>>>>>>>>>
