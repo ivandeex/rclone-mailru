@@ -12,6 +12,9 @@ import (
 	"github.com/rclone/rclone/fs/accounting"
 )
 
+// HideStreamResetError hides "stream closed" error
+var HideStreamResetError bool
+
 // Object serves an fs.Object via HEAD or GET
 func Object(w http.ResponseWriter, r *http.Request, o fs.Object) {
 	if r.Method != "HEAD" && r.Method != "GET" {
@@ -95,6 +98,10 @@ func Object(w http.ResponseWriter, r *http.Request, o fs.Object) {
 	_, err = io.Copy(ww, in)
 	n := ww.n
 	if err != nil {
+		if HideStreamResetError && err.Error() == "http2: stream closed" {
+			fs.Debugf(o, "Didn't finish writing GET request (wrote %d/%d bytes): %v", n, size, err)
+			return
+		}
 		fs.Errorf(o, "Didn't finish writing GET request (wrote %d/%d bytes): %v", n, size, err)
 		return
 	}

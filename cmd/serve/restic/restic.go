@@ -134,6 +134,7 @@ with a path of ` + "`/<username>/`" + `.
 				if terminal.IsTerminal(int(os.Stdout.Fd())) {
 					return errors.New("Refusing to run HTTP2 server directly on a terminal, please let restic start rclone")
 				}
+				serve.HideStreamResetError = os.Getenv("RCLONE_HIDE_STREAM_RESET") == "1"
 
 				conn := &StdioConn{
 					stdin:  os.Stdin,
