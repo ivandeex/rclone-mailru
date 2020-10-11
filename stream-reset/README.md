@@ -21,6 +21,21 @@ depends on the size of your backup repository.
 See the section ["running the test"](#running-the-test) below on how to
 reproduce the issue with restic and rclone.
 
+Or run a standalone test [http2test.go](https://github.com/ivandeex/rclone/blob/stream-reset/stream-reset/http2test.go)
+from this directory, which does not require restic or rclone:
+```
+go run http2test.go http1 nodrain 10
+```
+runs successfully
+```
+go run http2test.go http2 nodrain 10
+```
+prints error messages
+```
+go run http2test.go http2 drain 10
+```
+is successful again.
+
 ## The Solution
 
 Implementations of HTTP/1.1 and HTTP/2 in Go seem to treat the end of
