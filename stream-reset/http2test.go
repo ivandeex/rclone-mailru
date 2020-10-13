@@ -1,10 +1,17 @@
 package main
 
 import (
+	"bytes"
+	crand "crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"math/rand"
 	"net"
 	"net/http"
@@ -30,6 +37,7 @@ var out *log.Logger = log.New(os.Stderr, "", log.Ltime|log.Lmicroseconds)
 // ==== CLIENT ====
 
 func client(proto, serverAddr string, drain bool, testTime time.Duration) {
+	scheme := "http"
 	var client *http.Client
 	switch proto {
 	case "http1":
@@ -45,6 +53,10 @@ func client(proto, serverAddr string, drain bool, testTime time.Duration) {
 			Transport: tr,
 			Timeout:   60 * time.Second,
 		}
+	case "https2":
+		scheme = "https"
+		tr := &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+		client = &http.Client{Transport: tr}
 	}
 
 	endTime := time.Now().Add(testTime)
@@ -57,7 +69,7 @@ func client(proto, serverAddr string, drain bool, testTime time.Duration) {
 		}
 
 		size := randInt(minSize, maxSize)
-		url := fmt.Sprintf("http://%s/%d/%d/", serverAddr, loop, size)
+		url := fmt.Sprintf("%s://%s/%d/%d/", scheme, serverAddr, loop, size)
 		res, err := client.Get(url)
 		if err != nil {
 			out.Printf("client: GET error (%v)\n", err)
@@ -145,9 +157,56 @@ func server(proto string, addrCh chan<- string) {
 			out.Fatalf("accept failed (%v)\n", err)
 		}
 		srv2.ServeConn(con, opt2)
+	case "https2":
+		cert := []tls.Certificate{selfSignedCert()}
+		srv := &http.Server{
+			Handler:   &handler{},
+			TLSConfig: &tls.Config{Certificates: cert},
+		}
+		if err := http2.ConfigureServer(srv, nil); err != nil {
+			out.Fatalf("cannot configure http2 tls server (%v)\n", err)
+		}
+		_ = srv.ServeTLS(ln, "", "")
 	}
 
 	_ = ln.Close()
+}
+
+func selfSignedCert() tls.Certificate {
+	priv, err := rsa.GenerateKey(crand.Reader, 2048)
+	if err != nil {
+		out.Fatalf("private key failed (%v)\n", err)
+	}
+	privBytes := x509.MarshalPKCS1PrivateKey(priv)
+	pub := &priv.PublicKey
+
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{Organization: []string{"test"}},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour * 24),
+		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	tmpl.BasicConstraintsValid = true
+
+	derBytes, err := x509.CreateCertificate(crand.Reader, tmpl, tmpl, pub, priv)
+	if err != nil {
+		out.Fatalf("certificate failed (%v)\n", err)
+	}
+
+	crtBuf := &bytes.Buffer{}
+	keyBuf := &bytes.Buffer{}
+	err1 := pem.Encode(crtBuf, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	err2 := pem.Encode(keyBuf, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes})
+	if err1 != nil || err2 != nil {
+		out.Fatalf("cannot encode x509 (%v, %v)\n", err1, err2)
+	}
+	keyPair, err := tls.X509KeyPair(crtBuf.Bytes(), keyBuf.Bytes())
+	if err != nil {
+		out.Fatalf("cannot create x509 key pair (%v)\n", err)
+	}
+	return keyPair
 }
 
 // ==== MAIN ====
@@ -166,14 +225,15 @@ func makeBigFile() {
 }
 
 func main() {
-	usage := "usage: go run http2test.go http1|http2 drain|nodrain seconds\n"
+	usage := "usage: go run http2test.go http1|http2|https2 drain|nodrain seconds\n"
 	if len(os.Args) != 4 {
 		out.Fatalf(usage)
 	}
 
 	proto := os.Args[1]
 	switch proto {
-	case "http1", "http2":
+	case "http1", "http2", "https2":
+		// ok
 	default:
 		out.Fatalf(usage)
 	}
