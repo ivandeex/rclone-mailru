@@ -296,3 +296,52 @@ and the first one is the number of times this delay was hit. In my case it was:
 11758 0
 ```
 Thus, the critical delay is `<1ms` in `80%`, `1-2ms` in `18%`, `>2ms` in `2%` cases.
+
+## Comparing synchronous vs async drain methods
+
+Run 100 loops (more than enough for averaging) with _asynchronous_ drain and save statistics:
+```
+docker run -e RESTIC_RCLONE_DRAIN_SYNC=0 \
+           -e num_loops=100 \
+           -e show_stats=1 \
+           -e debugging=0
+           -e RESTIC_RCLONE_DRAIN=1 \
+           -e RESTIC_RCLONE_PORT=0 \
+           -e RESTIC_RCLONE_HTTP2=1 \
+           -e RESTIC_PASSWORD=$RESTIC_PASSWORD \
+           -v /path/to/repo:/repo \
+           -v /path/to/test/dir:/test \
+           --rm --name test -it \
+           ivandeex/restic-stream-reset
+```
+
+Every line in the `stats` file has four numbers:
+```
+iteration_number total_load_time load_speed total_load_size
+```
+where total load time is whole milliseconds, total load size is megabytes (rounded), load speed is ratio of time to size expressed as `milliseconds per megabyte`.
+
+Calculate average load time and speed:
+```
+awk '{st+=$2;sbw+=$3;n+=1} END{printf("avg_time=%d avg_speed=%d num_loops=%d\n",st/n,sbw/n,n)}' stats.log
+```
+
+Then re-run with _synchronous_ drain, save statistics, find average time and speed:
+```
+docker run -e RESTIC_RCLONE_DRAIN_SYNC=1 \
+           -e num_loops=100 \
+           ...
+awk '{st+=$2;sbw+=$3;n+=1} END{printf("avg_time=%d avg_speed=%d num_loops=%d\n",st/n,sbw/n,n)}' stats.log
+
+```
+
+For my 30G repository I have on average for 100 loops:
+```
+async drain: time: 55871 msec, speed: 1790 msec/MB
+synchronous: time: 56930 msec, speed: 1824 msec/MB
+```
+
+Load time per megabyte (aka speed) for sequential drain is 34ms (2%) more than in async case, on average.
+Total load time per run in sequential drain is 1sec (2%) more than in async case, on average.
+
+Conclusion: goroutine has a slight 2% imrovement.

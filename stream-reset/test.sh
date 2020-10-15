@@ -1,6 +1,7 @@
 #!/bin/bash
 
 export RESTIC_RCLONE_DRAIN=${RESTIC_RCLONE_DRAIN:-0}
+export RESTIC_RCLONE_DRAIN_SYNC=${RESTIC_RCLONE_DRAIN_SYNC:-0}
 export RESTIC_RCLONE_PORT=${RESTIC_RCLONE_PORT:-12345}
 export RESTIC_RCLONE_HTTP2=${RESTIC_RCLONE_HTTP2:-1}
 export RCLONE_HIDE_STREAM_RESET=${RCLONE_HIDE_STREAM_RESET:-0}
@@ -13,6 +14,7 @@ num_loops=${num_loops:-30}
 
 verbose=${verbose:-0}
 debugging=${debugging:-1}
+show_stats=${show_stats:-0}
 
 detect_errors=1
 detect_delays=0
@@ -59,13 +61,15 @@ for iter in $(seq "$num_loops"); do
 
     # restore repo in case user did "restic forget" before test
     rsync -a --delete "$repodir/repo/" "$repodir/repo.work/"
+    sync
+    sleep 2  # let disk io calm down
 
     # remove old logs, ensure empty logs in case debugging is 0
     rm -f ./output.log ./restic.log ./rclone.log
     touch ./output.log ./restic.log ./rclone.log
 
     $restic prune &>./output.log
-    sleep 1  # let rclone exit
+    sleep 2  # let rclone exit
 
     errors=$(grep -c ERROR ./rclone.log)
     if [[ $errors -ge 1 ]] && [[ $detect_errors = 1 ]]; then
@@ -77,6 +81,11 @@ for iter in $(seq "$num_loops"); do
     if [[ $delays -ge 1 ]] && [[ $detect_delays = 1 ]]; then
         echo "!!! found $delays delays at loop $iter"
         break
+    fi
+
+    stats=$(awk '/^LoadStats/{print$2,$3,$4}' ./output.log)
+    if [[ $show_stats = 1 ]] && [[ $stats ]]; then
+        echo "$iter $stats" | tee -a stats.log
     fi
 
     # save results without error
