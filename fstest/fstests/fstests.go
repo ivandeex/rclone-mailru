@@ -9,6 +9,7 @@ package fstests
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -39,6 +40,12 @@ import (
 	"github.com/rclone/rclone/lib/readers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+// Globals
+var (
+	flagSkipBadWindowsCharacters = flag.Bool("skip-bad-windows-characters", false, "Do not use bad Windows characters in tests")
+	flagSkipInvalidUTF8          = flag.Bool("skip-invalid-utf8", false, "Skip encoding test with invalid UTF-8")
 )
 
 // InternalTester is an optional interface for Fs which allows to execute internal tests
@@ -337,6 +344,22 @@ func removeConfigID(s string) string {
 // are inside the "FsMkdir" test.  Some tests require some tests files
 // - these are inside the "FsPutFiles" test.
 func Run(t *testing.T, opt *Opt) {
+	sausages := []string{
+		`hello? sausage`,
+		`hello? sausage/êé`,
+		`hello? sausage/êé/Hello, 世界`,
+		`hello? sausage/êé/Hello, 世界/ " ' @ < > & ? + ≠`,
+		`hello? sausage/êé/Hello, 世界/ " ' @ < > & ? + ≠/z.txt`,
+	}
+	if opt.SkipBadWindowsCharacters || *flagSkipBadWindowsCharacters {
+		sausages = []string{
+			`hello sausage`,
+			`hello sausage/êé`,
+			`hello sausage/êé/Hello, 世界`,
+			`hello sausage/êé/Hello, 世界/@ + ≠`,
+			`hello sausage/êé/Hello, 世界/@ + ≠/z.txt`,
+		}
+	}
 	var (
 		f             fs.Fs
 		remoteName    = opt.RemoteName
@@ -350,7 +373,7 @@ func Run(t *testing.T, opt *Opt) {
 		file1MimeType = "text/csv"
 		file2         = fstest.Item{
 			ModTime: fstest.Time("2001-02-03T04:05:10.123123123Z"),
-			Path:    `hello? sausage/êé/Hello, 世界/ " ' @ < > & ? + ≠/z.txt`,
+			Path:    sausages[4],
 		}
 		isLocalRemote        bool
 		purged               bool // whether the dir has been purged or not
@@ -661,7 +684,15 @@ func Run(t *testing.T, opt *Opt) {
 				{"URL encoding", "test%46.txt"},
 			} {
 				t.Run(test.name, func(t *testing.T) {
-					if opt.SkipInvalidUTF8 && test.name == "invalid UTF-8" {
+					skipBadWindowsCharacters := opt.SkipBadWindowsCharacters || *flagSkipBadWindowsCharacters
+					skipInvalidUTF8 := opt.SkipInvalidUTF8 || *flagSkipInvalidUTF8
+					if skipBadWindowsCharacters && test.name == "punctuation" {
+						t.Skip("Skipping " + test.name)
+					}
+					if skipBadWindowsCharacters && test.name == "trailing dot" {
+						t.Skip("Skipping " + test.name)
+					}
+					if skipInvalidUTF8 && test.name == "invalid UTF-8" {
 						t.Skip("Skipping " + test.name)
 					}
 					// turn raw strings into Standard encoding
@@ -923,16 +954,8 @@ func Run(t *testing.T, opt *Opt) {
 				skipIfNotOk(t)
 				objs, dirs, err := walk.GetAll(ctx, f, "", true, -1)
 				require.NoError(t, err)
-				assert.Equal(t, []string{
-					"hello? sausage",
-					"hello? sausage/êé",
-					"hello? sausage/êé/Hello, 世界",
-					"hello? sausage/êé/Hello, 世界/ \" ' @ < > & ? + ≠",
-				}, dirsToNames(dirs))
-				assert.Equal(t, []string{
-					"file name.txt",
-					"hello? sausage/êé/Hello, 世界/ \" ' @ < > & ? + ≠/z.txt",
-				}, objsToNames(objs))
+				assert.Equal(t, sausages[:4], dirsToNames(dirs))
+				assert.Equal(t, []string{"file name.txt", sausages[4]}, objsToNames(objs))
 			})
 
 			// Test the files are all there with
@@ -941,14 +964,8 @@ func Run(t *testing.T, opt *Opt) {
 				skipIfNotOk(t)
 				objs, dirs, err := walk.GetAll(ctx, f, path.Dir(path.Dir(path.Dir(path.Dir(file2.Path)))), true, -1)
 				require.NoError(t, err)
-				assert.Equal(t, []string{
-					"hello? sausage/êé",
-					"hello? sausage/êé/Hello, 世界",
-					"hello? sausage/êé/Hello, 世界/ \" ' @ < > & ? + ≠",
-				}, dirsToNames(dirs))
-				assert.Equal(t, []string{
-					"hello? sausage/êé/Hello, 世界/ \" ' @ < > & ? + ≠/z.txt",
-				}, objsToNames(objs))
+				assert.Equal(t, sausages[1:4], dirsToNames(dirs))
+				assert.Equal(t, []string{sausages[4]}, objsToNames(objs))
 			})
 
 			// TestFsListDirRoot tests that DirList works in the root
@@ -1002,7 +1019,7 @@ func Run(t *testing.T, opt *Opt) {
 				}
 				require.NoError(t, err)
 				assert.Equal(t, []string{file1.Path}, objsToNames(objs))
-				assert.Equal(t, []string{"hello? sausage", "hello? sausage/êé"}, dirsToNames(dirs))
+				assert.Equal(t, sausages[:2], dirsToNames(dirs))
 			}
 			t.Run("FsListLevel2", TestFsListLevel2)
 
@@ -1073,22 +1090,17 @@ func Run(t *testing.T, opt *Opt) {
 
 				fstest.CheckListingWithPrecision(t, f, []fstest.Item{file1, file2, fileToPurge}, []string{
 					"dirToPurge",
-					"hello? sausage",
-					"hello? sausage/êé",
-					"hello? sausage/êé/Hello, 世界",
-					"hello? sausage/êé/Hello, 世界/ \" ' @ < > & ? + ≠",
+					sausages[0],
+					sausages[1],
+					sausages[2],
+					sausages[3],
 				}, fs.GetModifyWindow(ctx, f))
 
 				// Now purge it
 				err = operations.Purge(ctx, f, "dirToPurge")
 				require.NoError(t, err)
 
-				fstest.CheckListingWithPrecision(t, f, []fstest.Item{file1, file2}, []string{
-					"hello? sausage",
-					"hello? sausage/êé",
-					"hello? sausage/êé/Hello, 世界",
-					"hello? sausage/êé/Hello, 世界/ \" ' @ < > & ? + ≠",
-				}, fs.GetModifyWindow(ctx, f))
+				fstest.CheckListingWithPrecision(t, f, []fstest.Item{file1, file2}, sausages[:4], fs.GetModifyWindow(ctx, f))
 			})
 
 			// TestFsCopy tests Copy
@@ -1232,10 +1244,10 @@ func Run(t *testing.T, opt *Opt) {
 				fstest.CheckListingWithPrecision(t, newRemote, []fstest.Item{file2Copy, file1Copy}, []string{
 					"new_name",
 					"new_name/sub_new_name",
-					"new_name/sub_new_name/hello? sausage",
-					"new_name/sub_new_name/hello? sausage/êé",
-					"new_name/sub_new_name/hello? sausage/êé/Hello, 世界",
-					"new_name/sub_new_name/hello? sausage/êé/Hello, 世界/ \" ' @ < > & ? + ≠",
+					"new_name/sub_new_name/" + sausages[0],
+					"new_name/sub_new_name/" + sausages[1],
+					"new_name/sub_new_name/" + sausages[2],
+					"new_name/sub_new_name/" + sausages[3],
 				}, newRemote.Precision())
 
 				// move it back
@@ -1243,12 +1255,7 @@ func Run(t *testing.T, opt *Opt) {
 				require.NoError(t, err)
 
 				// check remotes
-				fstest.CheckListingWithPrecision(t, f, []fstest.Item{file2, file1}, []string{
-					"hello? sausage",
-					"hello? sausage/êé",
-					"hello? sausage/êé/Hello, 世界",
-					"hello? sausage/êé/Hello, 世界/ \" ' @ < > & ? + ≠",
-				}, f.Precision())
+				fstest.CheckListingWithPrecision(t, f, []fstest.Item{file2, file1}, sausages[:4], f.Precision())
 				fstest.CheckListingWithPrecision(t, newRemote, []fstest.Item{}, []string{
 					"new_name",
 				}, newRemote.Precision())
