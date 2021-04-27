@@ -3,6 +3,7 @@ module github.com/rclone/rclone
 go 1.14
 
 replace github.com/jlaffaye/ftp => github.com/rclone/ftp v1.0.0-210902f
+replace goftp.io/server => github.com/ivandeex/goftp-server v0.4.2-0.20210428003143-e72e66b38892
 
 require (
 	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05

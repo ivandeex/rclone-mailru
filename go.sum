@@ -354,6 +354,8 @@ github.com/iguanesolutions/go-systemd/v5 v5.1.0 h1:UWprhbpxjLM0vvwu4MxaBR+/KzSxg
 github.com/iguanesolutions/go-systemd/v5 v5.1.0/go.mod h1:XprNDEZ9zdPzEg1WrmpV1BnGorgP0WP40AGurMxeQOY=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
+github.com/ivandeex/goftp-server v0.4.2-0.20210428003143-e72e66b38892 h1:j9j4eOkFXx55UcjP6fEuTh9olV/OjkW+gyjLHbosr1k=
+github.com/ivandeex/goftp-server v0.4.2-0.20210428003143-e72e66b38892/go.mod h1:hFZeR656ErRt3ojMKt7H10vQ5nuWV1e0YeUTeorlR6k=
 github.com/jcmturner/aescts/v2 v2.0.0 h1:9YKLH6ey7H4eDBXW8khjYslgyqG2xZikXP0EQFKrle8=
 github.com/jcmturner/aescts/v2 v2.0.0/go.mod h1:AiaICIRyfYg35RUkr8yESTqvSy7csK90qZ5xfvvsoNs=
 github.com/jcmturner/dnsutils/v2 v2.0.0 h1:lltnkeZGL0wILNvrNiVCR6Ro5PGU/SeBvVO/8c/iPbo=
