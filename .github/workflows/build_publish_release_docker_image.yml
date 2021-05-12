@@ -1,12 +1,11 @@
 name: Docker release build
 
 on:
-  release:
-    types: [published]
+  push:
 
 jobs:
     build:
-        if: github.repository == 'rclone/rclone'
+        if: startsWith(github.ref, 'refs/tags/plugin-')
         runs-on: ubuntu-latest
         name: Build image job
         steps:
@@ -23,18 +22,22 @@ jobs:
             - name: Get actual major version
               id: actual_major_version
               run: echo ::set-output name=ACTUAL_MAJOR_VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | sed 's/v//g' | cut -d "." -f 1)
+            - name: Get image tag
+              id: image_tag
+              run: echo ::set-output name=tag::${GITHUB_REF#refs/tags/plugin-}
+              shell: bash
             - name: Build and publish image
               uses: ilteoood/docker_buildx@1.1.0
               with:
-                tag: latest,${{ steps.actual_patch_version.outputs.ACTUAL_PATCH_VERSION }},${{ steps.actual_minor_version.outputs.ACTUAL_MINOR_VERSION }},${{ steps.actual_major_version.outputs.ACTUAL_MAJOR_VERSION }}
-                imageName: rclone/rclone
+                tag: latest,${{ steps.image_tag.outputs.tag }}
+                imageName: ivandeex/rclone
                 platform: linux/amd64,linux/386,linux/arm64,linux/arm/v7
                 publish: true
                 dockerHubUser: ${{ secrets.DOCKER_HUB_USER }}
                 dockerHubPassword: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
     build_docker_volume_plugin:
-        if: github.repository == 'rclone/rclone'
+        if: startsWith(github.ref, 'refs/tags/plugin-')
         needs: build
         runs-on: ubuntu-latest
         name: Build docker plugin job
@@ -46,8 +49,8 @@ jobs:
             - name: Build and publish docker plugin
               shell: bash
               run: |
-                VER=${GITHUB_REF#refs/tags/}
-                PLUGIN_USER=rclone
+                VER=${GITHUB_REF#refs/tags/plugin-}
+                PLUGIN_USER=ivandeex
                 docker login --username ${{ secrets.DOCKER_HUB_USER }} \
                              --password-stdin <<< "${{ secrets.DOCKER_HUB_PASSWORD }}"
                 for PLUGIN_ARCH in amd64 arm64 arm/v7 ;do
