@@ -2,13 +2,14 @@
 # Github Actions build for rclone
 # -*- compile-command: "yamllint -f parsable build.yml" -*-
 
-name: build
+name: build fork
 
 # Trigger the workflow on push or pull request
 on:
   push:
     branches:
       - '*'
+      - '!upstream'
     tags:
       - '*'
   pull_request:
@@ -20,7 +21,6 @@ on:
 
 jobs:
   build:
-    if: ${{ github.repository == 'rclone/rclone' || github.event.inputs.manual }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -35,18 +35,20 @@ jobs:
             build_flags: '-include "^linux/"'
             check: true
             quicktest: true
-            racequicktest: true
-            librclonetest: true
+            racequicktest: false
+            librclonetest: false
             deploy: true
+            enable: true
 
           - job_name: mac_amd64
             os: macOS-latest
             go: '1.16.x'
             gotags: 'cmount'
             build_flags: '-include "^darwin/amd64" -cgo'
-            quicktest: true
-            racequicktest: true
+            quicktest: false
+            racequicktest: false
             deploy: true
+            enable: true
 
           - job_name: mac_arm64
             os: macOS-latest
@@ -62,8 +64,9 @@ jobs:
             build_flags: '-include "^windows/amd64" -cgo'
             build_args: '-buildmode exe'
             quicktest: true
-            racequicktest: true
+            racequicktest: false
             deploy: true
+            enable: true
 
           - job_name: windows_386
             os: windows-latest
@@ -109,12 +112,14 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+        if: matrix.enable
 
       - name: Install Go
         uses: actions/setup-go@v2
         with:
           stable: 'false'
           go-version: ${{ matrix.go }}
+        if: matrix.enable
 
       - name: Set environment variables
         shell: bash
@@ -124,6 +129,7 @@ jobs:
           echo 'BUILD_ARGS=${{ matrix.build_args }}' >> $GITHUB_ENV
           if [[ "${{ matrix.goarch }}" != "" ]]; then echo 'GOARCH=${{ matrix.goarch }}' >> $GITHUB_ENV ; fi
           if [[ "${{ matrix.cgo }}" != "" ]]; then echo 'CGO_ENABLED=${{ matrix.cgo }}' >> $GITHUB_ENV ; fi
+        if: matrix.enable
 
       - name: Install Libraries on Linux
         shell: bash
@@ -132,14 +138,14 @@ jobs:
           sudo chmod 666 /dev/fuse
           sudo chown root:$USER /etc/fuse.conf
           sudo apt-get install fuse libfuse-dev rpm pkg-config
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.enable
 
       - name: Install Libraries on macOS
         shell: bash
         run: |
           brew update
           brew install --cask macfuse
-        if: matrix.os == 'macOS-latest'
+        if: matrix.os == 'macOS-latest' && matrix.enable
 
       - name: Install Libraries on Windows
         shell: powershell
@@ -155,7 +161,7 @@ jobs:
           # can be used on Windows as on macOS and Linux
           $path = (get-command mingw32-make.exe).Path
           Copy-Item -Path $path -Destination (Join-Path (Split-Path -Path $path) 'make.exe')
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && matrix.enable
 
       - name: Print Go version and environment
         shell: bash
@@ -168,6 +174,7 @@ jobs:
           make vars
           printf "\n\nSystem environment:\n\n"
           env
+        if: matrix.enable
 
       - name: Go module cache
         uses: actions/cache@v2
@@ -176,23 +183,25 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+        if: matrix.enable
 
       - name: Build rclone
         shell: bash
         run: |
           make
+        if: matrix.enable
 
       - name: Run tests
         shell: bash
         run: |
           make quicktest
-        if: matrix.quicktest
+        if: matrix.quicktest && matrix.enable
 
       - name: Race test
         shell: bash
         run: |
           make racequicktest
-        if: matrix.racequicktest
+        if: matrix.racequicktest && matrix.enable
 
       - name: Run librclone tests
         shell: bash
@@ -200,21 +209,55 @@ jobs:
           make -C librclone/ctest test
           make -C librclone/ctest clean
           librclone/python/test_rclone.py
-        if: matrix.librclonetest
+        if: matrix.librclonetest && matrix.enable
 
       - name: Code quality test
         shell: bash
         run: |
           make build_dep
           make check
-        if: matrix.check
+        if: matrix.check && matrix.enable
 
       - name: Compile all architectures test
         shell: bash
         run: |
           make
           make compile_all
-        if: matrix.compile_all
+        if: matrix.compile_all && matrix.enable
+
+      - name: Build beta
+        shell: bash
+        run: |
+          REF=${{ github.ref }}
+          TAG=${REF#refs/tags/}
+          GOTAGS=${{ matrix.gotags }}
+          BUILD_FLAGS="${{ matrix.build_flags }}"
+          ARCH=amd64
+          case ${{ matrix.job_name }} in
+            linux*)
+              OS=linux
+              BUILD_FLAGS="-include=linux/${ARCH}"
+              make release_dep_linux
+              ;;
+            windows*)
+              OS=windows
+              make release_dep_windows
+              ;;
+            mac*)
+              OS=osx
+              ;;
+          esac
+          export PATH=${PATH}:~/go/bin
+          go run bin/cross-compile.go -tags=$GOTAGS $BUILD_FLAGS $TAG
+          echo "ZIP=rclone-${TAG}-${OS}-${ARCH}.zip" >> $GITHUB_ENV
+        if: matrix.deploy && matrix.enable && startsWith(github.ref, 'refs/tags/v')
+
+      - name: Stash archive
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ env.ZIP }}
+          path: build/${{ env.ZIP }}
+        if: matrix.deploy && matrix.enable && startsWith(github.ref, 'refs/tags/v')
 
       - name: Deploy built binaries
         shell: bash
@@ -335,3 +378,80 @@ jobs:
            RCLONE_CONFIG_PASS: ${{ secrets.RCLONE_CONFIG_PASS }}
          # Upload artifacts if not a PR && not a fork
          if: github.head_ref == '' && github.repository == 'rclone/rclone'
+
+  beta:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Pull archives
+        uses: actions/download-artifact@v2
+
+      - name: Collect archives
+        shell: bash
+        run: |
+          REF=${{ github.ref }}
+          TAG=${REF#refs/tags/}
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          mkdir dist
+          mv -f *.zip/*.zip dist
+
+      - name: Release beta
+        uses: meeDamian/github-release@1.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: >
+            dist/rclone-${{ env.TAG }}-linux-amd64.zip
+            dist/rclone-${{ env.TAG }}-windows-amd64.zip
+            dist/rclone-${{ env.TAG }}-osx-amd64.zip
+          gzip: false
+          allow_override: true
+
+  integration:
+    if: startsWith(github.ref, 'refs/tags/test')
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          path: ./src/github.com/rclone/rclone
+
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          stable: 'false'
+          go-version: '1.16.x'
+
+      - name: Prepare integration
+        run: |
+          # build test binaries
+          export GOPATH=${{ runner.workspace }}
+          export PATH=$GOPATH/bin:$PATH
+          go install .
+          # create test configuration
+          mkdir -p /tmp/crypt
+          cat > ~/.rclone.conf <<EOF
+          ${{ secrets.test_conf }}
+          EOF
+          chmod 600 ~/.rclone.conf
+
+      - name: Run integration test
+        run: |
+          export PATH=${{ runner.workspace }}/bin:$PATH
+          go run ./fstest/test_all -config test-config.yml -verbose -timeout 1h |& tee integration.log
+
+      - name: Purge test directories
+        run: |
+          export PATH=${{ runner.workspace }}/bin:$PATH
+          for remote in drive dropbox TestS3 TestMailru ; do
+            (rclone lsd $remote: ||:) |awk '{print$5}' | grep rclone-test | xargs -rti rclone purge $remote:{} ||:
+          done
+
+      - name: Upload test log
+        uses: actions/upload-artifact@v1
+        with:
+          name: integration.log
+          path: integration.log

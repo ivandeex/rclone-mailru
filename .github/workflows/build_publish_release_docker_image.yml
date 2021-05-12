@@ -1,8 +1,7 @@
 name: Docker release build
 
 on:
-  release:
-    types: [published]
+  push:
 
 jobs:
     build:
@@ -34,8 +33,7 @@ jobs:
                 dockerHubPassword: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
     build_docker_volume_plugin:
-        if: github.repository == 'rclone/rclone'
-        needs: build
+        if: startsWith(github.ref, 'refs/tags/plugin')
         runs-on: ubuntu-latest
         name: Build and publish docker volume plugin
         steps:
@@ -48,7 +46,7 @@ jobs:
               run: |
                 GITHUB_REF=${{ github.ref }}
 
-                PLUGIN_IMAGE_USER=rclone
+                PLUGIN_IMAGE_USER=${{ secrets.DOCKER_HUB_USER }}
                 PLUGIN_IMAGE_NAME=docker-volume-rclone
                 PLUGIN_IMAGE_TAG=${GITHUB_REF#refs/tags/}
                 PLUGIN_IMAGE=${PLUGIN_IMAGE_USER}/${PLUGIN_IMAGE_NAME}:${PLUGIN_IMAGE_TAG}
