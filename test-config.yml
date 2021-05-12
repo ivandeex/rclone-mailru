@@ -1,0 +1,77 @@
+tests:
+ - path: backend
+   addbackend: true
+   nobinary:   true
+   short:      true
+ - path: fs/operations
+   fastlist: true
+ - path: fs/sync
+   fastlist: true
+ - path: vfs
+ - path: cmd/serve/restic
+   localonly: true
+backends:
+ - backend:  "chunker"
+   remote:   "TestChunkerLocal:"
+   fastlist: true
+ - backend:  "chunker"
+   remote:   "TestChunkerChunk3bLocal:"
+   fastlist: true
+   maxfile:  6k
+ #- backend:  "chunker"
+ #  remote:   "TestChunkerNometaLocal:"
+ #  fastlist: true
+ #- backend:  "chunker"
+ #  remote:   "TestChunkerChunk3bNometaLocal:"
+ #  fastlist: true
+ #  maxfile:  6k
+ #- backend:  "chunker"
+ #  remote:   "TestChunkerChunk3bNoRenameLocal:"
+ #  fastlist: true
+ #  maxfile:  6k
+ #- backend:  "chunker"
+ #  remote:   "TestChunkerMailru:"
+ #  fastlist: true
+ #- backend:  "chunker"
+ #  remote:   "TestChunkerChunk50bMailru:"
+ #  fastlist: true
+ #  maxfile:  10k
+ #- backend:  "chunker"
+ #  remote:   "TestChunkerS3:"
+ #  fastlist: true
+ #- backend:  "chunker"
+ #  remote:   "TestChunkerChunk50bMD5HashS3:"
+ #  fastlist: true
+ #  maxfile:  1k
+ #- backend:  "drive"
+ #  remote:   "drive:"
+ #  fastlist: true
+ #- backend:  "dropbox"
+ #  remote:   "dropbox:"
+ #  fastlist: false
+ #- backend:  "onedrive"
+ #  remote:   "onedrive:"
+ #  fastlist: false
+ #- backend:  "s3"
+ #  remote:   "TestS3:"
+ #  fastlist: true
+ #- backend:  "sftp"
+ #  remote:   "TestSFTPRclone:"
+ #  fastlist: false
+ #- backend:  "ftp"
+ #  remote:   "TestFTPRclone:"
+ #  ignore:
+ #    - "TestMultithreadCopy/{size:131071_streams:2}"
+ #    - "TestMultithreadCopy/{size:131072_streams:2}"
+ #    - "TestMultithreadCopy/{size:131073_streams:2}"
+ #  fastlist: false
+ #- backend:  "mailru"
+ #  remote:   "TestMailru:"
+ #  subdir:   false
+ #  fastlist: false
+ - backend:  "local"
+   remote:   ""
+   fastlist: false
+ - backend:  "memory"
+   remote:   ":memory:"
+   fastlist: true
