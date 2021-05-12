@@ -1,0 +1,69 @@
+tests:
+ - path: backend
+   addbackend: true
+   nobinary:   true
+   short:      true
+ - path: fs/operations
+   fastlist: true
+ - path: fs/sync
+   fastlist: true
+ - path: vfs
+ - path: cmd/serve/restic
+   localonly: true
+backends:
+ - backend:  "memory"
+   remote:   ":memory:"
+   fastlist: true
+ - backend:  "local"
+   remote:   ""
+   fastlist: false
+ - backend:  "drive"
+   remote:   "drive:"
+   fastlist: true
+   ignore:
+     - "TestIntegration/FsMkdir/FsPutFiles/PublicLink"
+ - backend:  "dropbox"
+   remote:   "dropbox:"
+   fastlist: false
+   ignore:
+     - "TestIntegration/FsMkdir/FsPutFiles/PublicLink"
+ - backend:  "onedrive"
+   remote:   "onedrive:"
+   fastlist: false
+   ignore:
+     - "TestIntegration/FsMkdir/FsPutFiles/PublicLink"
+ - backend:  "s3"
+   remote:   "TestS3:"
+   fastlist: true
+ - backend:  "sftp"
+   remote:   "hardy_sftp:"
+   fastlist: false
+ - backend:  "ftp"
+   remote:   "TestFTPRclone:"
+   fastlist: false
+   ignore:
+     - "TestIntegration/FsMkdir/FsEncoding/punctuation"
+     - "TestMultithreadCopy/{size:131071_streams:2}"
+     - "TestMultithreadCopy/{size:131072_streams:2}"
+     - "TestMultithreadCopy/{size:131073_streams:2}"
+ - backend:  "webdav"
+   remote:   "TestWebdavRclone:"
+   fastlist: false
+   ignore:
+     - TestFileReadAtZeroLength
+ - backend:  "mailru"
+   remote:   "TestMailru:"
+   subdir:   false
+   fastlist: false
+ - backend:  "chunker"
+   remote:   "TestChunkerChunk3bLocal:"
+   fastlist: true
+   maxfile:  4k
+ - backend:  "chunker"
+   remote:   "TestChunkerChunk50bMailru:"
+   fastlist: true
+   maxfile:  1k
+ - backend:  "chunker"
+   remote:   "TestChunkerChunk50bS3:"
+   fastlist: true
+   maxfile:  1k
