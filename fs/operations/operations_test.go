@@ -279,7 +279,7 @@ func TestHashSums(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			var buf bytes.Buffer
-			err := operations.HashLister(ctx, test.ht, test.base64, test.download, r.Fremote, &buf)
+			err := operations.HashLister(ctx, test.ht, test.base64, test.download, r.Fremote, &buf, nil)
 			require.NoError(t, err)
 			res := buf.String()
 			for _, line := range test.want {
@@ -301,13 +301,13 @@ func TestHashSumsWithErrors(t *testing.T) {
 
 	// MemoryFS supports MD5
 	buf := &bytes.Buffer{}
-	err = operations.HashLister(ctx, hash.MD5, false, false, memFs, buf)
+	err = operations.HashLister(ctx, hash.MD5, false, false, memFs, buf, nil)
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "336d5ebc5436534e61d16e63ddfca327  file1\n")
 
 	// MemoryFS can't do SHA1, but UNSUPPORTED must not appear in the output
 	buf.Reset()
-	err = operations.HashLister(ctx, hash.SHA1, false, false, memFs, buf)
+	err = operations.HashLister(ctx, hash.SHA1, false, false, memFs, buf, nil)
 	require.NoError(t, err)
 	assert.NotContains(t, buf.String(), " UNSUPPORTED ")
 

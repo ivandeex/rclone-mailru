@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/pkg/errors"
 	"github.com/rclone/rclone/cmd"
@@ -95,20 +96,73 @@ Note that hash names are case insensitive and values are output in lower case.
 		fsrc := cmd.NewFsSrc(args[1:])
 
 		cmd.Run(false, false, command, func() error {
+			ctx := context.Background()
 			if ChecksumFile != "" {
 				fsum, sumFile := cmd.NewFsFile(ChecksumFile)
-				return operations.CheckSum(context.Background(), fsrc, fsum, sumFile, ht, nil, DownloadFlag)
+				return operations.CheckSum(ctx, fsrc, fsum, sumFile, ht, nil, DownloadFlag)
 			}
 			if HashsumOutfile == "" {
-				return operations.HashLister(context.Background(), ht, OutputBase64, DownloadFlag, fsrc, nil)
+				return operations.HashLister(ctx, ht, OutputBase64, DownloadFlag, fsrc, nil, nil)
+			}
+			hashBuf, err := GetHashsumBuffer(ctx)
+			if err != nil {
+				return err
 			}
 			output, close, err := GetHashsumOutput(HashsumOutfile)
 			if err != nil {
 				return err
 			}
 			defer close()
-			return operations.HashLister(context.Background(), ht, OutputBase64, DownloadFlag, fsrc, output)
+			err = operations.HashLister(ctx, ht, OutputBase64, DownloadFlag, fsrc, output, hashBuf)
+			if err == nil && hashBuf != nil {
+				err = SortOutputFile(output, hashBuf, ht)
+			}
+			return err
 		})
 		return nil
 	},
+}
+
+// GetHashsumBuffer will setup hashsum accumulator if sorting is enabled
+func GetHashsumBuffer(ctx context.Context) (operations.HashSums, error) {
+	ci := fs.GetConfig(ctx)
+	switch ci.OrderBy {
+	case "":
+		return nil, nil
+	case "name", "name,asc", "name,ascending":
+		return operations.HashSums{}, nil
+	default:
+		return nil, errors.New("only --order-by name is supported")
+	}
+}
+
+// SortOutputFile will sort output file in place
+func SortOutputFile(out *os.File, hashBuf operations.HashSums, ht hash.Type) error {
+	if len(hashBuf) <= 1 {
+		return nil
+	}
+
+	sortedFiles := make([]string, 0, len(hashBuf))
+	for remote, sum := range hashBuf {
+		if sum == "" || sum == "UNSUPPORTED" {
+			continue
+		}
+		sortedFiles = append(sortedFiles, remote)
+	}
+	sort.Strings(sortedFiles)
+
+	if err := out.Truncate(0); err != nil {
+		return err
+	}
+	if _, err := out.Seek(0, os.SEEK_SET); err != nil {
+		return err
+	}
+
+	width := hash.Width(ht)
+	for _, remote := range sortedFiles {
+		sum := hashBuf[remote]
+		_, _ = fmt.Fprintf(out, "%*s  %s\n", width, sum, remote)
+	}
+
+	return nil
 }

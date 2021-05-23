@@ -32,19 +32,28 @@ hashed locally enabling SHA-1 for any remote.
 		cmd.CheckArgs(1, 1, command, args)
 		fsrc := cmd.NewFsSrc(args)
 		cmd.Run(false, false, command, func() error {
+			ctx := context.Background()
 			if hashsum.ChecksumFile != "" {
 				fsum, sumFile := cmd.NewFsFile(hashsum.ChecksumFile)
-				return operations.CheckSum(context.Background(), fsrc, fsum, sumFile, hash.SHA1, nil, hashsum.DownloadFlag)
+				return operations.CheckSum(ctx, fsrc, fsum, sumFile, hash.SHA1, nil, hashsum.DownloadFlag)
 			}
 			if hashsum.HashsumOutfile == "" {
-				return operations.HashLister(context.Background(), hash.SHA1, hashsum.OutputBase64, hashsum.DownloadFlag, fsrc, nil)
+				return operations.HashLister(ctx, hash.SHA1, hashsum.OutputBase64, hashsum.DownloadFlag, fsrc, nil, nil)
+			}
+			hashBuf, err := hashsum.GetHashsumBuffer(ctx)
+			if err != nil {
+				return err
 			}
 			output, close, err := hashsum.GetHashsumOutput(hashsum.HashsumOutfile)
 			if err != nil {
 				return err
 			}
 			defer close()
-			return operations.HashLister(context.Background(), hash.SHA1, hashsum.OutputBase64, hashsum.DownloadFlag, fsrc, output)
+			err = operations.HashLister(ctx, hash.SHA1, hashsum.OutputBase64, hashsum.DownloadFlag, fsrc, output, hashBuf)
+			if err == nil && hashBuf != nil {
+				err = hashsum.SortOutputFile(output, hashBuf, hash.SHA1)
+			}
+			return err
 		})
 	},
 }
