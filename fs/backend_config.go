@@ -20,6 +20,9 @@ const (
 
 	// ConfigKeyEphemeralPrefix marks config keys which shouldn't be stored in the config file
 	ConfigKeyEphemeralPrefix = "config_"
+
+	// ConfigKeySyncPrefix marks config keys received from remote instances
+	ConfigKeySyncPrefix = "configsync_"
 )
 
 // ConfigOAuth should be called to do the OAuth

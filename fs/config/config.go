@@ -462,6 +462,7 @@ func updateRemote(ctx context.Context, name string, keyValues rc.Params, opt Upd
 
 	choices := configmap.Simple{}
 	m := fs.ConfigMap(ri, name, nil)
+	sync := false
 
 	// Set the config
 	for k, v := range keyValues {
@@ -482,18 +483,21 @@ func updateRemote(ctx context.Context, name string, keyValues rc.Params, opt Upd
 		if !strings.HasPrefix(k, fs.ConfigKeyEphemeralPrefix) {
 			m.Set(k, vStr)
 		}
+		if strings.HasPrefix(k, fs.ConfigKeySyncPrefix) {
+			sync = true
+		}
 	}
 	if opt.Edit {
 		choices[fs.ConfigEdit] = "true"
 	}
 
-	if interactive {
+	if interactive && !sync {
 		var state = ""
 		if opt.All {
 			state = fs.ConfigAll
 		}
 		err = backendConfig(ctx, name, m, ri, choices, state)
-	} else {
+	} else if !sync {
 		// Start the config state machine
 		in := fs.ConfigIn{
 			State:  opt.State,

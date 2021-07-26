@@ -4,6 +4,7 @@ package fs
 
 import (
 	"os"
+	"strings"
 
 	"github.com/rclone/rclone/fs/config/configmap"
 )
@@ -69,6 +70,7 @@ type setConfigFile string
 
 // Set a config item into the config file
 func (section setConfigFile) Set(key, value string) {
+	key = strings.TrimPrefix(key, ConfigKeySyncPrefix)
 	Debugf(nil, "Saving config %q in section %q of the config file", key, section)
 	err := ConfigFileSet(string(section), key, value)
 	if err != nil {
@@ -88,6 +90,10 @@ func (section getConfigFile) Get(key string) (value string, ok bool) {
 	}
 	return value, ok
 }
+
+// ConfigSyncSetterMaker produces setters for sending config updates to remote receivers.
+// It's a reference to decouple configsync and configmap packages preventing import loop.
+var ConfigSyncSetterMaker configmap.SetterMaker
 
 // ConfigMap creates a configmap.Map from the *RegInfo and the
 // configName passed in. If connectionStringConfig has any entries (it may be nil),
@@ -128,6 +134,17 @@ func ConfigMap(fsInfo *RegInfo, configName string, connectionStringConfig config
 	}
 
 	// Set Config
+
+	// write to config file
 	config.AddSetter(setConfigFile(configName))
+
+	// send to remote config receivers
+	if ConfigSyncSetterMaker != nil {
+		syncSetter := ConfigSyncSetterMaker.MakeSetter(configName)
+		if syncSetter != nil {
+			config.AddSetter(syncSetter)
+		}
+	}
+
 	return config
 }

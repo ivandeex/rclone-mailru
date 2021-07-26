@@ -12,6 +12,7 @@ import (
 
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/config"
+	"github.com/rclone/rclone/fs/config/configsync"
 	"github.com/rclone/rclone/fs/config/flags"
 	fsLog "github.com/rclone/rclone/fs/log"
 	"github.com/rclone/rclone/fs/rc"
@@ -37,6 +38,7 @@ var (
 	uploadHeaders   []string
 	downloadHeaders []string
 	headers         []string
+	configReceivers []string
 )
 
 // AddFlags adds the non filing system specific flags to the command
@@ -137,6 +139,7 @@ func AddFlags(ci *fs.ConfigInfo, flagSet *pflag.FlagSet) {
 	flags.BoolVarP(flagSet, &ci.DisableHTTP2, "disable-http2", "", ci.DisableHTTP2, "Disable HTTP/2 in the global transport")
 	flags.BoolVarP(flagSet, &ci.HumanReadable, "human-readable", "", ci.HumanReadable, "Print numbers in a human-readable format, sizes with suffix Ki|Mi|Gi|Ti|Pi")
 	flags.DurationVarP(flagSet, &ci.KvLockTime, "kv-lock-time", "", ci.KvLockTime, "Maximum time to keep key-value database locked by process")
+	flags.StringArrayVarP(flagSet, &configReceivers, "config-to", "", nil, "Send config updates to remote rclone instances.")
 }
 
 // ParseHeaders converts the strings passed in via the header flags into HTTPOptions
@@ -270,11 +273,19 @@ func SetFlags(ci *fs.ConfigInfo) {
 	if len(headers) != 0 {
 		ci.Headers = ParseHeaders(headers)
 	}
+
 	if len(dscp) != 0 {
 		if value, ok := parseDSCP(dscp); ok {
 			ci.TrafficClass = value << 2
 		} else {
 			log.Fatalf("--dscp: Invalid DSCP name: %v", dscp)
+		}
+	}
+
+	if len(configReceivers) > 0 {
+		var err error
+		if fs.ConfigSyncSetterMaker, err = configsync.Setup(configReceivers); err != nil {
+			log.Fatalf("Failed to setup config receivers: %v", err)
 		}
 	}
 

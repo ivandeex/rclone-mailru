@@ -42,6 +42,13 @@ type Mapper interface {
 	Setter
 }
 
+// SetterMaker provides an interface to produce Setters
+// It decouples configsync and configmap packages preventing import loop.
+type SetterMaker interface {
+	// MakeSetter returns setter for given config section
+	MakeSetter(section string) Setter
+}
+
 // Map provides a wrapper around multiple Setter and
 // Getter interfaces.
 type Map struct {
