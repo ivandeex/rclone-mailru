@@ -21,6 +21,7 @@ import (
 var (
 	ErrVolumeNotFound   = errors.New("volume not found")
 	ErrVolumeExists     = errors.New("volume already exists")
+	ErrMountStuck       = errors.New("volume mount stuck")
 	ErrMountpointExists = errors.New("non-empty mountpoint already exists")
 )
 
@@ -35,6 +36,7 @@ type Volume struct {
 	Path       string    `json:"path,omitempty"` // for "remote:path" or ":backend:path"
 	Options    VolOpts   `json:"options"`        // all options together
 	Mounts     []string  `json:"mounts"`         // mountReqs as a string list
+	Stuck      bool      `json:"stuck,omitempty"`
 	mountReqs  map[string]interface{}
 	fsString   string // result of merging Fs, Type and Options
 	persist    bool
@@ -250,6 +252,10 @@ func (vol *Volume) clearCache() error {
 
 // mount volume filesystem
 func (vol *Volume) mount(id string) error {
+	if vol.Stuck {
+		return ErrMountStuck
+	}
+
 	drv := vol.drv
 	count := len(vol.mountReqs)
 	fs.Debugf(nil, "Mount volume %q for id %q at path %s (count %d)",
@@ -271,9 +277,22 @@ func (vol *Volume) mount(id string) error {
 		return errors.New("volume filesystem is not ready")
 	}
 
-	if _, err := vol.mnt.Mount(); err != nil {
-		return err
+	result := make(chan error)
+	go func() {
+		// ignore daemonized flag, hang forever if mount gets stuck
+		_, err := vol.mnt.Mount()
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		if err != nil {
+			return err
+		}
+	case <-time.After(waitTimeout):
+		vol.Stuck = true
+		return ErrMountStuck
 	}
+
 	vol.mnt.MountedOn = time.Now()
 	vol.mountReqs[id] = nil
 	vol.drv.monChan <- false // ask monitor to refresh channels

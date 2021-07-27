@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -28,6 +29,7 @@ var (
 	canPersist  = false // allows writing to config file
 	forgetState = false
 	noSpec      = false
+	waitTimeout = 1 * time.Hour
 )
 
 func init() {
@@ -38,6 +40,7 @@ func init() {
 	flags.IntVarP(cmdFlags, &socketGid, "socket-gid", "", socketGid, "GID for unix socket (default: current process GID)")
 	flags.BoolVarP(cmdFlags, &forgetState, "forget-state", "", forgetState, "Skip restoring previous state")
 	flags.BoolVarP(cmdFlags, &noSpec, "no-spec", "", noSpec, "Do not write spec file")
+	flags.DurationVarP(cmdFlags, &waitTimeout, "mount-timeout", "", waitTimeout, "maximum time to wait for mount")
 	// Add common mount/vfs flags
 	mountlib.AddFlags(cmdFlags)
 	vfsflags.AddFlags(cmdFlags)
@@ -52,8 +55,7 @@ var Command = &cobra.Command{
 	Run: func(command *cobra.Command, args []string) {
 		cmd.CheckArgs(0, 0, command, args)
 		cmd.Run(false, false, command, func() error {
-			ctx := context.Background()
-			drv, err := NewDriver(ctx, baseDir, nil, nil, false, forgetState)
+			drv, err := NewDriver(context.Background(), baseDir, nil, nil, false, forgetState)
 			if err != nil {
 				return err
 			}
