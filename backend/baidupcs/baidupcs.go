@@ -1,31 +1,36 @@
-// Package mega provides an interface to the Baidu PCS (aka Baidu Yun, Baidu Pan, Baidu NetDisk)
+// Package baidupcs provides an interface to the Baidu PCS
 // object storage system.
+// (aka Baidu Yun, Baidu Pan, Baidu NetDisk)
 package baidupcs
 
 import (
-	"github.com/ncw/rclone/fs"
-	"time"
-	"github.com/ncw/rclone/lib/pacer"
+	"context"
 	"fmt"
-	"github.com/ncw/rclone/fs/config/configmap"
-	"github.com/ncw/rclone/fs/config/configstruct"
-	"github.com/iikira/BaiduPCS-Go/baidupcs"
-	"strconv"
-	"log"
-	"github.com/ncw/rclone/fs/hash"
 	"io"
-	"github.com/ncw/rclone/fs/config"
-	"github.com/iikira/Baidu-Login"
-	"github.com/ncw/rclone/lib/readers"
+	"log"
 	"math/rand"
-	"github.com/pkg/errors"
 	"net/http"
-	"github.com/iikira/BaiduPCS-Go/requester"
-	"github.com/iikira/BaiduPCS-Go/requester/multipartreader"
-	"github.com/iikira/BaiduPCS-Go/baidupcs/pcserror"
+	"net/url"
 	"path"
+	"strconv"
 	"strings"
-	"github.com/ncw/rclone/lib/dircache"
+	"time"
+
+	"github.com/pkg/errors"
+	"github.com/rclone/rclone/fs"
+	"github.com/rclone/rclone/fs/config"
+	"github.com/rclone/rclone/fs/config/configmap"
+	"github.com/rclone/rclone/fs/config/configstruct"
+	"github.com/rclone/rclone/fs/hash"
+	"github.com/rclone/rclone/lib/dircache"
+	"github.com/rclone/rclone/lib/pacer"
+	"github.com/rclone/rclone/lib/readers"
+
+	"github.com/qjfoidnh/Baidu-Login"
+	"github.com/qjfoidnh/BaiduPCS-Go/baidupcs"
+	"github.com/qjfoidnh/BaiduPCS-Go/baidupcs/pcserror"
+	"github.com/qjfoidnh/BaiduPCS-Go/requester"
+	"github.com/qjfoidnh/BaiduPCS-Go/requester/multipartreader"
 )
 
 const (
@@ -51,75 +56,7 @@ func init() {
 		Name:        "baidupcs",
 		Description: "Baidu PCS (aka Baidu Yun, Baidu Pan, Baidu NetDisk)",
 		NewFs:       NewFs,
-		Config: func(name string, m configmap.Mapper) {
-
-			// Skip login if BDUSS is specified by user
-			if bduss, _ := m.Get(configBDUSS); bduss != "" {
-				return
-			}
-
-			fmt.Printf("Baidu username / email / phone number: ")
-			username := config.ReadLine()
-			fmt.Printf("Password: ")
-			password := config.ReadPassword()
-
-			loginClient := baidulogin.NewBaiduClinet()
-
-			var bduss, code, codeStr string
-			success := false
-			for !success {
-				loginJson := loginClient.BaiduLogin(username, password, code, codeStr)
-				switch loginJson.ErrInfo.No {
-				case "0": // Success
-					bduss = loginJson.Data.BDUSS
-					success = true
-				case "400023", "400101": // 2FA
-					fmt.Println("Please choose a method to complete 2FA:")
-
-					var methods []string
-					phone := loginJson.Data.Phone
-					if phone != "未找到手机号" {
-						methods = append(methods, "pPhone")
-					}
-					email := loginJson.Data.Email
-					if email != "未找到邮箱地址" {
-						methods = append(methods, "eEmail")
-					}
-
-					method := map[string]string{
-						"p": "mobile",
-						"e": "email",
-					}[string(config.Command(methods))]
-					codeMsg := loginClient.SendCodeToUser(method, loginJson.Data.Token)
-					fmt.Printf("Code requested. (Message from remote: %s)\n", codeMsg)
-
-					fmt.Printf("Please enter the code you received: ")
-					code = config.ReadLine()
-					loginJson = loginClient.VerifyCode(method, loginJson.Data.Token, code, loginJson.Data.U)
-					if loginJson.ErrInfo.No != "0" {
-						log.Fatalf("unable to complete 2FA: %s", loginJson.ErrInfo.Msg)
-					}
-
-					bduss = loginJson.Data.BDUSS
-					success = true
-				case "500001", "500002": // Captcha
-					fmt.Println("Captcha required. Please open the link to see the image.")
-					fmt.Printf("(Message from remote: %s)\n", loginJson.ErrInfo.Msg)
-					codeStr = loginJson.Data.CodeString
-					if codeStr == "" {
-						log.Fatalf("received empty codeString from remote")
-					}
-
-					fmt.Println("https://wappass.baidu.com/cgi-bin/genimage?" + codeStr)
-					fmt.Println("Please enter the code you see: ")
-					code = config.ReadLine()
-					continue // 2FA might be required even after captcha
-				default: // Error
-					log.Fatalf("unable to login; err code: %s, err message: %s", loginJson.ErrInfo.No, loginJson.ErrInfo.Msg)
-				}
-			}
-			m.Set(configBDUSS, bduss)
-		},
+		Config:      Config,
 		Options: []fs.Option{
 			{
 				Name:     configBDUSS,
@@ -171,6 +108,77 @@ type Options struct {
 	ChunkSize         fs.SizeSuffix `config:"chunk_size"`
 }
 
+// Config ...
+func Config(ctx context.Context, name string, m configmap.Mapper, cfg fs.ConfigIn) (*fs.ConfigOut, error) {
+	// Skip login if BDUSS is specified by user
+	if bduss, _ := m.Get(configBDUSS); bduss != "" {
+		return nil, nil
+	}
+
+	fmt.Printf("Baidu username / email / phone number: ")
+	username := config.ReadLine()
+	fmt.Printf("Password: ")
+	password := config.ReadPassword()
+
+	loginClient := baidulogin.NewBaiduClinet()
+
+	var bduss, code, codeStr string
+	success := false
+	for !success {
+		loginJSON := loginClient.BaiduLogin(username, password, code, codeStr)
+		switch loginJSON.ErrInfo.No {
+		case "0": // Success
+			bduss = loginJSON.Data.BDUSS
+			success = true
+		case "400023", "400101": // 2FA
+			fmt.Println("Please choose a method to complete 2FA:")
+
+			var methods []string
+			phone := loginJSON.Data.Phone
+			if phone != "未找到手机号" {
+				methods = append(methods, "pPhone")
+			}
+			email := loginJSON.Data.Email
+			if email != "未找到邮箱地址" {
+				methods = append(methods, "eEmail")
+			}
+
+			method := map[string]string{
+				"p": "mobile",
+				"e": "email",
+			}[string(config.Command(methods))]
+			codeMsg := loginClient.SendCodeToUser2(method, loginJSON.Data.Token)
+			fmt.Printf("Code requested. (Message from remote: %s)\n", codeMsg)
+
+			fmt.Printf("Please enter the code you received: ")
+			code = config.ReadLine()
+			loginJSON = loginClient.VerifyCode2(method, loginJSON.Data.Token, code, loginJSON.Data.U)
+			if loginJSON.ErrInfo.No != "0" {
+				log.Fatalf("unable to complete 2FA: %s", loginJSON.ErrInfo.Msg)
+			}
+
+			bduss = loginJSON.Data.BDUSS
+			success = true
+		case "500001", "500002": // Captcha
+			fmt.Println("Captcha required. Please open the link to see the image.")
+			fmt.Printf("(Message from remote: %s)\n", loginJSON.ErrInfo.Msg)
+			codeStr = loginJSON.Data.CodeString
+			if codeStr == "" {
+				log.Fatalf("received empty codeString from remote")
+			}
+
+			fmt.Println("https://wappass.baidu.com/cgi-bin/genimage?" + codeStr)
+			fmt.Println("Please enter the code you see: ")
+			code = config.ReadLine()
+			continue // 2FA might be required even after captcha
+		default: // Error
+			log.Fatalf("unable to login; err code: %s, err message: %s", loginJSON.ErrInfo.No, loginJSON.ErrInfo.Msg)
+		}
+	}
+	m.Set(configBDUSS, bduss)
+	return nil, nil
+}
+
 func shouldRetry(resp *http.Response, err error) (bool, error) {
 	if err != nil {
 		if pcsErr, ok := err.(pcserror.Error); ok {
@@ -183,13 +191,13 @@ func shouldRetry(resp *http.Response, err error) (bool, error) {
 
 // Fs represents a remote box
 type Fs struct {
-	name        string                // name of this remote
-	root        string                // the path we are working on
-	opt         *Options              // parsed options
-	features    *fs.Features          // optional features
-	srv         *baidupcs.BaiduPCS    // the connection to the server
-	pacer       *pacer.Pacer          // pacer for API calls
-	uploadToken *pacer.TokenDispenser // control concurrency
+	name     string             // name of this remote
+	root     string             // the path we are working on
+	opt      *Options           // parsed options
+	features *fs.Features       // optional features
+	srv      *baidupcs.BaiduPCS // the connection to the server
+	pacer    *fs.Pacer
+	// unused uploadToken *pacer.TokenDispenser // control concurrency
 }
 
 func (f *Fs) newHTTPClient() *requester.HTTPClient {
@@ -254,7 +262,8 @@ func (f *Fs) newDownloadFunc(rPointer *io.ReadCloser, openOpts ...fs.OpenOption)
 	}
 }
 
-func (f *Fs) About() (*fs.Usage, error) {
+// About ...
+func (f *Fs) About(ctx context.Context) (*fs.Usage, error) {
 	total, used, err := f.srv.QuotaInfo()
 	if err != nil {
 		return nil, err
@@ -288,11 +297,12 @@ func (f *Fs) Features() *fs.Features {
 	return f.features
 }
 
+// Precision ...
 func (f *Fs) Precision() time.Duration {
 	return time.Second
 }
 
-// Returns the supported hash types of the filesystem
+// Hashes returns the supported hash types of the filesystem
 func (f *Fs) Hashes() hash.Set {
 	return hash.Set(hash.MD5)
 }
@@ -307,7 +317,7 @@ func (f *Fs) Hashes() hash.Set {
 // This returns fs.ErrorDirNotFound if the directory isn't found.
 //
 // This function accepts file paths and treat them the same as directories
-func (f *Fs) List(dir string) (entries fs.DirEntries, err error) {
+func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err error) {
 	var rawEntries baidupcs.FileDirectoryList
 	err = f.pacer.Call(func() (bool, error) {
 		rawEntries, err = f.srv.FilesDirectoriesList(f.getServerSidePath(dir), baidupcs.DefaultOrderOptions)
@@ -342,7 +352,7 @@ func (f *Fs) List(dir string) (entries fs.DirEntries, err error) {
 // It returns the destination Object and a possible error
 //
 // If it isn't possible then return fs.ErrorCantCopy
-func (f *Fs) Copy(src fs.Object, remote string) (fs.Object, error) {
+func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
 	srcObj, ok := src.(*Object)
 	if !ok {
 		fs.Debugf(src, "Can't copy - not same remote type")
@@ -370,7 +380,7 @@ func (f *Fs) Copy(src fs.Object, remote string) (fs.Object, error) {
 // This is stored with the remote path given
 //
 // It returns the destination Object and a possible error
-func (f *Fs) Move(src fs.Object, remote string) (fs.Object, error) {
+func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
 	srcObj, ok := src.(*Object)
 	if !ok {
 		fs.Debugf(src, "Can't move - not same remote type")
@@ -392,7 +402,7 @@ func (f *Fs) Move(src fs.Object, remote string) (fs.Object, error) {
 // using server side move operations.
 //
 // If destination exists then return fs.ErrorDirExists
-func (f *Fs) DirMove(src fs.Fs, srcRemote, dstRemote string) error {
+func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string) error {
 	srcFs, ok := src.(*Fs)
 	if !ok {
 		fs.Debugf(srcFs, "Can't move directory - not same remote type")
@@ -412,7 +422,7 @@ func (f *Fs) DirMove(src fs.Fs, srcRemote, dstRemote string) error {
 		if err != fs.ErrorObjectNotFound {
 			return err
 		}
-		_, err = f.Move(srcFs.newObjectLocal(srcRemote, time.Time{}, 0), dstRemote)
+		_, err = f.Move(ctx, srcFs.newObjectLocal(srcRemote, time.Time{}, 0), dstRemote)
 		return err
 	}
 	return fs.ErrorDirExists
@@ -420,7 +430,7 @@ func (f *Fs) DirMove(src fs.Fs, srcRemote, dstRemote string) error {
 
 // NewObject finds the Object at remote.  If it can't be found
 // it returns the error fs.ErrorObjectNotFound.
-func (f *Fs) NewObject(remote string) (fs.Object, error) {
+func (f *Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
 	return f.newObjectWithInfo(remote, nil)
 }
 
@@ -429,9 +439,9 @@ func (f *Fs) NewObject(remote string) (fs.Object, error) {
 // May create the object even if it returns an error - if so
 // will return the object and the error, otherwise will return
 // nil and the error
-func (f *Fs) Put(in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
-	o := f.newObjectLocal(src.Remote(), src.ModTime(), src.Size())
-	return o, o.Update(in, src, options...)
+func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
+	o := f.newObjectLocal(src.Remote(), src.ModTime(ctx), src.Size())
+	return o, o.Update(ctx, in, src, options...)
 }
 
 // PutStream uploads to the remote path with the modTime given of indeterminate size
@@ -439,14 +449,14 @@ func (f *Fs) Put(in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.
 // May create the object even if it returns an error - if so
 // will return the object and the error, otherwise will return
 // nil and the error
-func (f *Fs) PutStream(in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
-	return f.Put(in, src, options...)
+func (f *Fs) PutStream(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
+	return f.Put(ctx, in, src, options...)
 }
 
 // Mkdir makes the directory (container, bucket)
 //
 // Shouldn't return an error if it already exists
-func (f *Fs) Mkdir(dir string) error {
+func (f *Fs) Mkdir(ctx context.Context, dir string) error {
 	return f.pacer.Call(func() (bool, error) {
 		err := f.srv.Mkdir(f.getServerSidePath(dir))
 		if err != nil && err.GetRemoteErrCode() == 31061 { // Dir already exists
@@ -459,8 +469,8 @@ func (f *Fs) Mkdir(dir string) error {
 // Rmdir removes the directory (container, bucket) if empty
 //
 // Return an error if it doesn't exist or isn't empty
-func (f *Fs) Rmdir(dir string) error {
-	entries, err := f.List(dir)
+func (f *Fs) Rmdir(ctx context.Context, dir string) error {
+	entries, err := f.List(ctx, dir)
 	if err != nil {
 		return err
 	}
@@ -516,7 +526,7 @@ type Object struct {
 }
 
 // ModTime returns the modification date of the file
-func (o *Object) ModTime() time.Time {
+func (o *Object) ModTime(ctx context.Context) time.Time {
 	err := o.readMetaData()
 	if err != nil {
 		fs.Logf(o, "Failed to read metadata: %v", err)
@@ -525,16 +535,18 @@ func (o *Object) ModTime() time.Time {
 	return o.modTime
 }
 
+// Storable is always true
 func (o *Object) Storable() bool {
 	return true
 }
 
-func (o *Object) SetModTime(time.Time) error {
+// SetModTime is impossible
+func (o *Object) SetModTime(ctx context.Context, t time.Time) error {
 	return fs.ErrorCantSetModTime
 }
 
-// Open opens the file for read.  Call Close() on the returned io.ReadCloser
-func (o *Object) Open(options ...fs.OpenOption) (io.ReadCloser, error) {
+// Open the file for read.  Call Close() on the returned io.ReadCloser
+func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadCloser, error) {
 	// TODO: multithread?
 	var r io.ReadCloser
 	err := o.fs.srv.DownloadFile(o.fs.getServerSidePath(o.remote), o.fs.newDownloadFunc(&r, options...))
@@ -545,14 +557,14 @@ func (o *Object) Open(options ...fs.OpenOption) (io.ReadCloser, error) {
 }
 
 // Update the object
-func (o *Object) Update(in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (err error) {
+func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (err error) {
 
 	// Rapid upload
 	cutoff := o.fs.opt.RapidUploadCutoff
 	var md5Sum string
 	if cutoff > 0 && o.size >= int64(cutoff) {
 		fs.Debugf(o, "testing rapid upload availability")
-		md5Sum, err = src.Hash(hash.MD5)
+		md5Sum, err = src.Hash(ctx, hash.MD5)
 		if err != nil {
 			if err == hash.ErrUnsupported {
 				fs.Debugf(o, "src does not support MD5 hash - skipping rapid upload")
@@ -597,7 +609,9 @@ func (o *Object) Update(in io.Reader, src fs.ObjectInfo, options ...fs.OpenOptio
 	}
 
 	// Commit
-	err = o.fs.srv.UploadCreateSuperFile(o.fs.getServerSidePath(o.remote), checksumList...)
+	policy := "overwrite"
+	checkDir := false // FIXME true?
+	err = o.fs.srv.UploadCreateSuperFile(policy, checkDir, o.fs.getServerSidePath(o.remote), checksumList...)
 	if err != nil {
 		return err
 	}
@@ -616,7 +630,8 @@ func (o *Object) Update(in io.Reader, src fs.ObjectInfo, options ...fs.OpenOptio
 	return nil
 }
 
-func (o *Object) Remove() error {
+// Remove object
+func (o *Object) Remove(ctx context.Context) error {
 	return o.fs.pacer.Call(func() (bool, error) {
 		return shouldRetry(nil, o.fs.srv.Remove(o.fs.getServerSidePath(o.remote)))
 	})
@@ -641,7 +656,7 @@ func (o *Object) Remote() string {
 }
 
 // Hash returns the SHA-1 of an object returning a lowercase hex string
-func (o *Object) Hash(t hash.Type) (string, error) {
+func (o *Object) Hash(ctx context.Context, t hash.Type) (string, error) {
 	if t != hash.MD5 {
 		return "", hash.ErrUnsupported
 	}
@@ -692,7 +707,7 @@ func (o *Object) setMetaData(info *baidupcs.FileDirectory) (err error) {
 }
 
 // NewFs constructs an Fs from the path, container:path
-func NewFs(name, root string, m configmap.Mapper) (fs.Fs, error) {
+func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, error) {
 	// Parse config into Options struct
 	opt := &Options{}
 	err := configstruct.Set(m, opt)
@@ -700,37 +715,48 @@ func NewFs(name, root string, m configmap.Mapper) (fs.Fs, error) {
 		return nil, err
 	}
 
-	appId, err := strconv.Atoi(opt.AppID)
+	appID, err := strconv.Atoi(opt.AppID)
 	if err != nil {
 		log.Fatalf("cannot convert appid to int: %v", err)
 	}
 
 	root = strings.Trim(root, "/")
-	pcsClient := baidupcs.NewPCS(appId, opt.BDUSS)
-	pcsClient.SetHTTPS(opt.UseHTTPS)
-	pcsClient.SetUserAgent(opt.UserAgent)
-
 	f := &Fs{
-		name:  name,
-		root:  root,
-		opt:   opt,
-		srv:   pcsClient,
-		pacer: pacer.New().SetMinSleep(minSleep).SetMaxSleep(maxSleep).SetDecayConstant(decayConstant),
+		name: name,
+		root: root,
+		opt:  opt,
 	}
+
+	baiduURL := &url.URL{
+		Scheme: "http",
+		Host:   "pan.baidu.com",
+	}
+	baiduCookie := &http.Cookie{
+		Name:   "BDUSS",
+		Value:  opt.BDUSS,
+		Domain: baidupcs.DotBaiduCom,
+	}
+	cli := requester.NewHTTPClient()
+	cli.ResetCookiejar()
+	cli.Jar.SetCookies(baiduURL, []*http.Cookie{baiduCookie})
+	cli.SetUserAgent(opt.UserAgent)
+	f.srv = baidupcs.NewPCSWithClient(appID, cli)
+	f.srv.SetHTTPS(opt.UseHTTPS)
+
+	f.pacer = fs.NewPacer(ctx, pacer.NewDefault(pacer.MinSleep(minSleep), pacer.MaxSleep(maxSleep), pacer.DecayConstant(decayConstant)))
 	f.features = (&fs.Features{
-		CaseInsensitive: true,
+		CaseInsensitive:         true,
 		CanHaveEmptyDirectories: true,
-	}).Fill(f)
+	}).Fill(ctx, f)
 
 	// Ensure root is a directory
-	entries, err := f.List("")
+	entries, err := f.List(ctx, "")
 	if err != nil {
 		if err == fs.ErrorDirNotFound {
 			// Neither file nor directory
 			return f, nil
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 
 	var rootIsFile bool
@@ -742,7 +768,7 @@ func NewFs(name, root string, m configmap.Mapper) (fs.Fs, error) {
 	if rootIsFile {
 		newRoot, _ := dircache.SplitPath(root)
 		f.root = newRoot
-		_, newErr := f.List("")
+		_, newErr := f.List(ctx, "")
 		if newErr != nil {
 			return nil, newErr
 		}

@@ -4,6 +4,8 @@ go 1.14
 
 replace github.com/jlaffaye/ftp => github.com/rclone/ftp v1.0.0-210902f
 
+replace github.com/iikira/BaiduPCS-Go => github.com/qjfoidnh/BaiduPCS-Go v0.0.0-20211006143010-a9db0e11ffaf
+
 require (
 	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05
 	cloud.google.com/go v0.93.3 // indirect
@@ -56,6 +58,8 @@ require (
 	github.com/prometheus/common v0.30.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/putdotio/go-putio/putio v0.0.0-20200123120452-16d982cac2b8
+	github.com/qjfoidnh/Baidu-Login v1.4.0
+	github.com/qjfoidnh/BaiduPCS-Go v0.0.0-20211006143010-a9db0e11ffaf
 	github.com/rfjakob/eme v1.1.2
 	github.com/shirou/gopsutil/v3 v3.21.8
 	github.com/sirupsen/logrus v1.8.1
