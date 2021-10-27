@@ -23,6 +23,7 @@ import (
 	"github.com/rclone/rclone/fs/config/configstruct"
 	"github.com/rclone/rclone/fs/hash"
 	"github.com/rclone/rclone/lib/dircache"
+	"github.com/rclone/rclone/lib/encoder"
 	"github.com/rclone/rclone/lib/pacer"
 	"github.com/rclone/rclone/lib/readers"
 
@@ -94,18 +95,39 @@ func init() {
 				Default:  defaultChunkSize,
 				Advanced: true,
 			},
+			{
+				Name:     config.ConfigEncoding,
+				Help:     config.ConfigEncodingHelp,
+				Advanced: true,
+				// Baidu rejects many special characters
+				// By default use safe encoding to have tests pass:
+				// encoding = Slash,Ctl,RightPeriod,RightSpace,InvalidUtf8,Asterisk,BackSlash,Colon,DoubleQuote,LtGt,Pipe,Question
+				Default: (encoder.EncodeSlash |
+					encoder.EncodeCtl |
+					encoder.EncodeRightPeriod |
+					encoder.EncodeRightSpace |
+					encoder.EncodeBackSlash |
+					encoder.EncodeWin |
+					encoder.EncodeInvalidUtf8),
+				Examples: []fs.OptionExample{{
+					// Let users disable encoding completely
+					Value: "none",
+					Help:  "Do not encode file names",
+				}},
+			},
 		},
 	})
 }
 
 // Options defines the configuration for this backend
 type Options struct {
-	BDUSS             string        `config:"bduss"`
-	AppID             string        `config:"appid"`
-	UserAgent         string        `config:"user_agent"`
-	UseHTTPS          bool          `config:"use_https"`
-	RapidUploadCutoff fs.SizeSuffix `config:"rapid_upload_cutoff"`
-	ChunkSize         fs.SizeSuffix `config:"chunk_size"`
+	BDUSS             string               `config:"bduss"`
+	AppID             string               `config:"appid"`
+	UserAgent         string               `config:"user_agent"`
+	UseHTTPS          bool                 `config:"use_https"`
+	RapidUploadCutoff fs.SizeSuffix        `config:"rapid_upload_cutoff"`
+	ChunkSize         fs.SizeSuffix        `config:"chunk_size"`
+	Enc               encoder.MultiEncoder `config:"encoding"`
 }
 
 // Config ...
@@ -330,7 +352,7 @@ func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err e
 		return
 	}
 	for _, rawEntry := range rawEntries {
-		remote := path.Join(dir, rawEntry.Filename)
+		remote := path.Join(dir, f.opt.Enc.ToStandardName(rawEntry.Filename))
 		if rawEntry.Isdir {
 			d := fs.NewDir(remote, time.Unix(rawEntry.Mtime, 0))
 			entries = append(entries, d)
@@ -510,7 +532,7 @@ func (f *Fs) newObjectLocal(remote string, modTime time.Time, size int64) *Objec
 }
 
 func (f *Fs) getServerSidePath(p string) string {
-	return path.Clean(path.Join("/", f.root, "/", p))
+	return f.opt.Enc.FromStandardPath(path.Clean(path.Join("/", f.root, "/", p)))
 }
 
 // Object describes a BaiduPCS object
