@@ -27,9 +27,10 @@ import (
 	"github.com/rclone/rclone/lib/pacer"
 	"github.com/rclone/rclone/lib/readers"
 
-	"github.com/qjfoidnh/Baidu-Login"
+	baidulogin "github.com/qjfoidnh/Baidu-Login"
 	"github.com/qjfoidnh/BaiduPCS-Go/baidupcs"
 	"github.com/qjfoidnh/BaiduPCS-Go/baidupcs/pcserror"
+	"github.com/qjfoidnh/BaiduPCS-Go/pcsverbose"
 	"github.com/qjfoidnh/BaiduPCS-Go/requester"
 	"github.com/qjfoidnh/BaiduPCS-Go/requester/multipartreader"
 )
@@ -130,12 +131,13 @@ type Options struct {
 	Enc               encoder.MultiEncoder `config:"encoding"`
 }
 
-// Config ...
+// Config configures baidu remote
 func Config(ctx context.Context, name string, m configmap.Mapper, cfg fs.ConfigIn) (*fs.ConfigOut, error) {
 	// Skip login if BDUSS is specified by user
 	if bduss, _ := m.Get(configBDUSS); bduss != "" {
 		return nil, nil
 	}
+	setupClientLogging(ctx)
 
 	fmt.Printf("Baidu username / email / phone number: ")
 	username := config.ReadLine()
@@ -199,6 +201,10 @@ func Config(ctx context.Context, name string, m configmap.Mapper, cfg fs.ConfigI
 	}
 	m.Set(configBDUSS, bduss)
 	return nil, nil
+}
+
+func setupClientLogging(ctx context.Context) {
+	pcsverbose.IsVerbose = fs.GetConfig(ctx).LogLevel >= fs.LogLevelDebug
 }
 
 func shouldRetry(resp *http.Response, err error) (bool, error) {
@@ -319,9 +325,15 @@ func (f *Fs) Features() *fs.Features {
 	return f.features
 }
 
-// Precision ...
+// Precision of the filesystem.
+// FIXME in many tests Put fails to set time!
+// The value returned is a conservative upper bound.
+// In practice the I/O delay depends on client location:
+//   <1s  - when accessed from mainland China
+//   2-4s - when accessed from overseas, e.g. Europe
 func (f *Fs) Precision() time.Duration {
-	return time.Second
+	// return 5 * time.Second
+	return fs.ModTimeNotSupported // FIXME
 }
 
 // Hashes returns the supported hash types of the filesystem
@@ -392,9 +404,9 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 		}))
 	})
 	if err != nil {
-		return f.newObjectLocal(remote, srcObj.modTime, srcObj.size), nil
+		return nil, err
 	}
-	return nil, err
+	return f.newObjectLocal(remote, srcObj.modTime, srcObj.size), nil
 }
 
 // Move src to this remote using server side move operations.
@@ -579,76 +591,86 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClo
 }
 
 // Update the object
-func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (err error) {
+func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) error {
+	size := src.Size()
+	if size == 0 { // FIXME maybe can?
+		return fs.ErrorCantUploadEmptyFiles
+	}
+
+	md5, err := src.Hash(ctx, hash.MD5)
+	if err == hash.ErrUnsupported {
+		md5 = ""
+		err = nil
+	}
+	if err != nil {
+		return err
+	}
+
+	f := o.fs
+	path := f.getServerSidePath(o.remote)
 
 	// Rapid upload
-	cutoff := o.fs.opt.RapidUploadCutoff
-	var md5Sum string
-	if cutoff > 0 && o.size >= int64(cutoff) {
-		fs.Debugf(o, "testing rapid upload availability")
-		md5Sum, err = src.Hash(ctx, hash.MD5)
-		if err != nil {
-			if err == hash.ErrUnsupported {
-				fs.Debugf(o, "src does not support MD5 hash - skipping rapid upload")
-			} else {
-				return err
-			}
-		} else {
-			o.md5 = md5Sum // TODO: Okay here?
-
-			// According to BaiduPCS-Go, CRC32 is actually not required
-			// and slice MD5 only needs to match the MD5 hex string format
-			err = o.fs.srv.RapidUpload(o.fs.getServerSidePath(o.remote), md5Sum, generateRandomMD5(), "0", o.size)
-			if err != nil {
-				fs.Debugf(o, "starting regular upload because rapid upload failed: %v", err)
-			} else {
-				fs.Debugf(o, "rapid upload successful")
-				return nil
-			}
+	cutoff := f.opt.RapidUploadCutoff
+	if md5 != "" && cutoff > 0 && size >= int64(cutoff) {
+		err = f.srv.RapidUpload(path, md5, generateRandomMD5(), "0", size)
+		if err == nil {
+			o.md5 = md5
+			o.size = size
+			fs.Debugf(o, "rapid upload successful")
+			return nil
 		}
+		fs.Debugf(o, "starting regular upload because rapid upload failed: %v", err)
 	}
 
 	// Regular upload
-	// TODO: Refine this
 	// TODO: Use MultiUploader?
-	var checksumList []string
-	remaining := o.size
-	position := int64(0)
+	var (
+		sumList   []string
+		position  int64
+		remaining = size
+		chunkSize = int64(f.opt.ChunkSize)
+	)
+
 	for remaining > 0 {
-		n := int64(o.fs.opt.ChunkSize)
+		n := chunkSize
 		if remaining < n {
 			n = remaining
 		}
+		fs.Debugf(o, "Uploading segment size %d pos %d of %d", n, position, size)
 		chunk := readers.NewRepeatableReader(io.LimitReader(in, n))
-		fs.Debugf(o, "Uploading segment %d/%d size %d", position, o.size, n)
-		checksum, err := o.fs.srv.UploadTmpFile(o.fs.newFragmentUploadFunc(n, chunk))
+		fragFunc := f.newFragmentUploadFunc(n, chunk)
+		checksum, err := f.srv.UploadTmpFile(fragFunc)
 		if err != nil {
 			return err
 		}
 		remaining -= n
 		position += n
-		checksumList = append(checksumList, checksum)
+		sumList = append(sumList, checksum)
 	}
 
 	// Commit
-	policy := "overwrite"
-	checkDir := false // FIXME true?
-	err = o.fs.srv.UploadCreateSuperFile(policy, checkDir, o.fs.getServerSidePath(o.remote), checksumList...)
+	const (
+		policy   = "overwrite"
+		checkDir = false // FIXME true?
+	)
+	err = f.srv.UploadCreateSuperFile(policy, checkDir, path, sumList...)
 	if err != nil {
 		return err
 	}
 
-	// Fix MD5 for uploaded file - from BaiduPCS-Go
-	if md5Sum != "" {
-		err = o.fs.srv.RapidUpload(o.fs.getServerSidePath(o.remote), md5Sum, generateRandomMD5(), "0", o.size)
-		if err != nil {
-			return errors.Wrap(err, "unable to fix MD5 for uploaded file (the file should have been uploaded)")
-		}
-		fs.Debugf(o, "fixed MD5 for this file on the server")
-	} else {
-		fs.Debugf(o, "src MD5 unavailable - not fixing md5 on server")
-	}
+	o.md5 = md5
+	o.size = size
 
+	// Fix MD5 for uploaded file
+	if md5 == "" {
+		fs.Debugf(o, "source MD5 unavailable - not fixing on server")
+		return nil
+	}
+	err = f.srv.RapidUpload(path, md5, generateRandomMD5(), "0", size)
+	if err != nil {
+		return errors.Wrap(err, "unable to fix MD5 for uploaded file (the file should have been uploaded)")
+	}
+	fs.Debugf(o, "fixed MD5 for this file on the server")
 	return nil
 }
 
@@ -700,23 +722,35 @@ func (o *Object) Size() int64 {
 // it also sets the info
 //
 // Returns fs.ErrorObjectNotFound if not found
-func (o *Object) readMetaData() (err error) {
+func (o *Object) readMetaData() error {
 	if o.hasMetaData {
 		return nil
 	}
-	var info *baidupcs.FileDirectory
-	err = o.fs.pacer.Call(func() (bool, error) {
-		info0, err := o.fs.srv.FilesDirectoriesMeta(o.fs.getServerSidePath(o.remote))
+	info, err := o.fs.getMetaData(o.remote)
+	if err != nil {
+		return err
+	}
+	if info.Isdir {
+		return fs.ErrorIsDir
+	}
+	return o.setMetaData(info)
+}
+
+// getMetaData for a path
+func (f *Fs) getMetaData(remote string) (info *baidupcs.FileDirectory, err error) {
+	path := f.getServerSidePath(remote)
+	err = f.pacer.Call(func() (bool, error) {
+		info0, err := f.srv.FilesDirectoriesMeta(path)
 		info = info0
 		return shouldRetry(nil, err)
 	})
-	if err != nil {
-		if pcsErr, ok := err.(pcserror.Error); ok && pcsErr.GetErrType() == pcserror.ErrTypeRemoteError {
-			return fs.ErrorObjectNotFound
-		}
-		return err
+	if err == nil {
+		return info, nil
 	}
-	return o.setMetaData(info)
+	if pcsErr, ok := err.(pcserror.Error); ok && pcsErr.GetErrType() == pcserror.ErrTypeRemoteError {
+		return nil, fs.ErrorObjectNotFound
+	}
+	return nil, err
 }
 
 // setMetaData sets the metadata from info
@@ -739,7 +773,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 	appID, err := strconv.Atoi(opt.AppID)
 	if err != nil {
-		log.Fatalf("cannot convert appid to int: %v", err)
+		return nil, errors.Wrapf(err, "cannot convert app_id to integer: %q", opt.AppID)
 	}
 
 	root = strings.Trim(root, "/")
@@ -764,6 +798,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	cli.SetUserAgent(opt.UserAgent)
 	f.srv = baidupcs.NewPCSWithClient(appID, cli)
 	f.srv.SetHTTPS(opt.UseHTTPS)
+	setupClientLogging(ctx)
 
 	f.pacer = fs.NewPacer(ctx, pacer.NewDefault(pacer.MinSleep(minSleep), pacer.MaxSleep(maxSleep), pacer.DecayConstant(decayConstant)))
 	f.features = (&fs.Features{
