@@ -354,6 +354,10 @@ github.com/iguanesolutions/go-systemd/v5 v5.1.0 h1:UWprhbpxjLM0vvwu4MxaBR+/KzSxg
 github.com/iguanesolutions/go-systemd/v5 v5.1.0/go.mod h1:XprNDEZ9zdPzEg1WrmpV1BnGorgP0WP40AGurMxeQOY=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
+github.com/ivandeex/go-icloud v0.0.1 h1:Q/P0v6eOJ0N2N24WxH3LI63za5P60gnAmtbakLXjOUM=
+github.com/ivandeex/go-icloud v0.0.1/go.mod h1:MDZ23HKjx0RRXy0U8PLeTO4VOpJJTdki+ntYRuz/Zk0=
+github.com/ivandeex/go-icloud v0.0.2 h1:553oB2iAt9kZalaFuyoBonWVVJeuOleOKlBoQdN34sQ=
+github.com/ivandeex/go-icloud v0.0.2/go.mod h1:MDZ23HKjx0RRXy0U8PLeTO4VOpJJTdki+ntYRuz/Zk0=
 github.com/jcmturner/aescts/v2 v2.0.0 h1:9YKLH6ey7H4eDBXW8khjYslgyqG2xZikXP0EQFKrle8=
 github.com/jcmturner/aescts/v2 v2.0.0/go.mod h1:AiaICIRyfYg35RUkr8yESTqvSy7csK90qZ5xfvvsoNs=
 github.com/jcmturner/dnsutils/v2 v2.0.0 h1:lltnkeZGL0wILNvrNiVCR6Ro5PGU/SeBvVO/8c/iPbo=
@@ -625,6 +629,8 @@ github.com/tklauser/numcpus v0.3.0 h1:ILuRUQBtssgnxw0XXIjKUC56fgnOrFoQQ/4+DeU2bi
 github.com/tklauser/numcpus v0.3.0/go.mod h1:yFGUr7TUHQRAhyqBcEg0Ge34zDBAsIvJJcyE6boqnA8=
 github.com/tv42/httpunix v0.0.0-20191220191345-2ba4b9c3382c h1:u6SKchux2yDvFQnDHS3lPnIRmfVJ5Sxy3ao2SIdysLQ=
 github.com/tv42/httpunix v0.0.0-20191220191345-2ba4b9c3382c/go.mod h1:hzIxponao9Kjc7aWznkXaL4U4TWaDSs8zcsY4Ka08nM=
+github.com/vanym/golang-netscape-cookiejar v1.0.0 h1:Yi5ZTiGaq0jmw/Dst1aulMcEjuzCGUn7FNsy5cq97cE=
+github.com/vanym/golang-netscape-cookiejar v1.0.0/go.mod h1:xX9CJoRqG3KkxhfMdrkweBcuMSSyZP822xHHwXcUO24=
 github.com/viant/assertly v0.4.8/go.mod h1:aGifi++jvCrUaklKEKT0BU95igDNaqkvz+49uaYMPRU=
 github.com/viant/toolbox v0.24.0/go.mod h1:OxMCG57V0PXuIP2HNQrtJf2CjqdmbrOx5EkMILuUhzM=
 github.com/vivint/infectious v0.0.0-20200605153912-25a574ae18a3 h1:zMsHhfK9+Wdl1F7sIKLyx3wrOFofpb3rWFbA4HgcK5k=

@@ -36,6 +36,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/hanwen/go-fuse/v2 v2.1.0
 	github.com/iguanesolutions/go-systemd/v5 v5.1.0
+	github.com/ivandeex/go-icloud v0.0.2
 	github.com/jcmturner/gokrb5/v8 v8.4.2
 	github.com/jlaffaye/ftp v0.0.0-20210307004419-5d4190119067
 	github.com/jzelinskie/whirlpool v0.0.0-20201016144138-0675e54bb004
